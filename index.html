@@ -265,7 +265,6 @@
         <div class="label">Ускорение</div>
       </div>
 
-      <!-- 🔥 НОВАЯ ШКАЛА МАСШТАБА -->
       <div class="control-group">
         <input
           type="range"
@@ -274,7 +273,7 @@
           min="0"
           max="7"
           step="1"
-          value="0"
+          value="7"
         />
         <div class="value-display" id="zoomScaleValue">1x</div>
         <div class="label">Масштаб</div>
@@ -285,23 +284,15 @@
         <div class="label">Пауза</div>
       </div>
 
-      <!-- 🔥 ЗАМЕНА: галочка вместо кнопки пропуска -->
-      <div class="control-group">
-        <label><input type="checkbox" id="autoSkipToggle" /> Автопропуск</label>
-      </div>
-
       <div class="control-group flag-control">
         <label><input type="checkbox" id="flagToggle" /> Флаг</label>
         <label><input type="checkbox" id="followToggle" /> Следовать</label>
         <label><input type="checkbox" id="autopilotToggle" /> Автопилот</label>
         <button id="focusBtn">К дирижаблю</button>
         <button id="targetBtn">Добавить маркер</button>
-        <!-- 🔥 УДАЛЕНО: offlineBtn -->
-        <!-- 🔥 ДОБАВЛЕНО: кнопки позиции и синхронизации -->
-        <button id="savePosBtn">💾</button>
-        <button id="loadPosBtn">📂</button>
         <button id="syncTimeBtn">⏱️ Синхр.</button>
         <button id="coalBtn" class="coal-btn">Загрузить уголь</button>
+        <button id="newGameBtn">🆕 Новая игра</button>
       </div>
     </div>
 
@@ -347,8 +338,9 @@
 
       const MAX_COAL_RESERVE = 900000;
       const COAL_CONSUMPTION_RATE = 0.001;
-      const ZOOM_SCALE_LEVELS = [12, 11, 10, 9, 8, 6, 4, 2];
-      let currentZoomScaleIndex = 0;
+      // 🔥 МАСШТАБ: теперь 0 = далеко, 7 = близко
+      const ZOOM_SCALE_LEVELS = [2, 4, 6, 8, 9, 10, 11, 15]; // 1000x → 1x
+      let currentZoomScaleIndex = 7; // по умолчанию 1x (zoom=12)
 
       const ENGINE_POWER_RATE = 1.0;
       const MAX_SPEED = 135;
@@ -373,8 +365,6 @@
         followEnabled: false,
         autopilotEnabled: false,
         fastBrakeEnabled: false,
-        autoSkipEnabled: false,
-        autoSkipTargetSeconds: 86400,
         startTime: null,
         totalDistanceMeters: 0,
         coalReserve: 0,
@@ -629,6 +619,27 @@
         return `${dateStr} ${timeStr}`;
       }
 
+      // 🔥 Расчёт времени угля
+      function calculateCoalTimeRemaining() {
+        if (airshipData.coalReserve <= 0) return "00:00";
+        const powerPercent = Math.abs(airshipData.enginePower);
+        if (powerPercent < 0.1) return "∞"; // вечность
+
+        const consumptionPerSecond =
+          (powerPercent * COAL_CONSUMPTION_RATE) / 60; // кг/с
+        const seconds = airshipData.coalReserve / consumptionPerSecond;
+
+        if (seconds > 24 * 3600) return "∞";
+
+        const h = Math.floor(seconds / 3600)
+          .toString()
+          .padStart(2, "0");
+        const m = Math.floor((seconds % 3600) / 60)
+          .toString()
+          .padStart(2, "0");
+        return `${h}:${m}`;
+      }
+
       function updateStats() {
         let timeDiffText = "00:00";
         if (airshipData.virtualStartTime) {
@@ -649,9 +660,10 @@
           }
         }
 
+        const coalTime = calculateCoalTimeRemaining();
         document.getElementById("stats").innerHTML =
           `Пройдено: ${formatDistance(airshipData.totalDistanceMeters)}<br>` +
-          `Уголь: ${formatCoal(airshipData.totalCoalBurned)} / ${formatCoal(airshipData.coalReserve)} кг<br>` +
+          `Уголь: ${formatCoal(airshipData.totalCoalBurned)} / ${formatCoal(airshipData.coalReserve)} кг (${coalTime})<br>` +
           `Время: ${formatVirtualDateTime(airshipData.virtualElapsedSeconds)}<br>` +
           `Разница: ${timeDiffText}`;
       }
@@ -692,15 +704,15 @@
         document.getElementById("timeWarpValue").textContent =
           timeWarpFactor + "x";
         const zoomLabels = [
-          "1x",
-          "2x",
-          "5x",
-          "10x",
-          "100x",
-          "200x",
-          "500x",
           "1000x",
-        ];
+          "500x",
+          "200x",
+          "100x",
+          "10x",
+          "5x",
+          "2x",
+          "1x",
+        ].reverse();
         document.getElementById("zoomScaleValue").textContent =
           zoomLabels[currentZoomScaleIndex];
         document.getElementById("pauseBtn").textContent = isPaused
@@ -710,8 +722,40 @@
           airshipData.autopilotEnabled;
         document.getElementById("fastBrakeToggle").checked =
           airshipData.fastBrakeEnabled;
-        document.getElementById("autoSkipToggle").checked =
-          airshipData.autoSkipEnabled;
+      }
+
+      let lastUrlUpdate = 0;
+      function updateUrl() {
+        const now = Date.now();
+        if (now - lastUrlUpdate < 1000) return;
+        lastUrlUpdate = now;
+
+        const url = new URL(window.location);
+        url.searchParams.set("lat", airshipData.lat.toFixed(6));
+        url.searchParams.set("lng", airshipData.lng.toFixed(6));
+        url.searchParams.set("hdg", airshipData.heading.toFixed(1));
+        url.searchParams.set("spd", airshipData.speed.toFixed(1));
+        url.searchParams.set("thr", airshipData.throttle);
+        url.searchParams.set("rud", airshipData.rudder.toFixed(1));
+        url.searchParams.set("eng", airshipData.enginePower.toFixed(1));
+        url.searchParams.set("crl", airshipData.coalReserve.toFixed(3));
+        url.searchParams.set("cbn", airshipData.totalCoalBurned.toFixed(3));
+        url.searchParams.set("tgt", airshipData.hasTarget ? "1" : "0");
+        if (airshipData.hasTarget) {
+          url.searchParams.set("tlt", airshipData.targetLat.toFixed(6));
+          url.searchParams.set("tlg", airshipData.targetLng.toFixed(6));
+        }
+        url.searchParams.set("apl", airshipData.autopilotEnabled ? "1" : "0");
+        url.searchParams.set("fbr", airshipData.fastBrakeEnabled ? "1" : "0");
+        url.searchParams.set(
+          "vst",
+          Math.floor(airshipData.virtualStartTime / 1000),
+        );
+        url.searchParams.set(
+          "vel",
+          airshipData.virtualElapsedSeconds.toFixed(1),
+        );
+        window.history.replaceState(null, "", url);
       }
 
       function runAutopilot() {
@@ -1004,8 +1048,6 @@
           followEnabled: false,
           autopilotEnabled: false,
           fastBrakeEnabled: false,
-          autoSkipEnabled: false,
-          autoSkipTargetSeconds: 86400,
           startTime: Date.now(),
           totalDistanceMeters: 0,
           coalReserve: 5000,
@@ -1041,71 +1083,145 @@
         }, 10000);
       }
 
+      function loadFromUrl() {
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+
+          const lat = parseFloat(urlParams.get("lat"));
+          const lng = parseFloat(urlParams.get("lng"));
+          if (
+            isNaN(lat) ||
+            isNaN(lng) ||
+            Math.abs(lat) > 90 ||
+            Math.abs(lng) > 180
+          ) {
+            return false;
+          }
+
+          airshipData.lat = lat;
+          airshipData.lng = lng;
+
+          const safeFloat = (key, def) => {
+            const val = parseFloat(urlParams.get(key));
+            return isNaN(val) ? def : val;
+          };
+          const safeInt = (key, def) => {
+            const val = parseInt(urlParams.get(key), 10);
+            return isNaN(val) ? def : val;
+          };
+          const safeBool = (key) => urlParams.get(key) === "1";
+
+          airshipData.heading = safeFloat("hdg", 0);
+          airshipData.speed = safeFloat("spd", 0);
+          airshipData.throttle = safeInt("thr", 0);
+          airshipData.rudder = safeFloat("rud", 0);
+          airshipData.enginePower = safeFloat("eng", 0);
+          airshipData.coalReserve = safeFloat("crl", 5000);
+          airshipData.totalCoalBurned = safeFloat("cbn", 0);
+          airshipData.hasTarget = safeBool("tgt");
+
+          if (airshipData.hasTarget) {
+            const tlt = safeFloat("tlt", NaN);
+            const tlg = safeFloat("tlg", NaN);
+            if (
+              isNaN(tlt) ||
+              isNaN(tlg) ||
+              Math.abs(tlt) > 90 ||
+              Math.abs(tlg) > 180
+            ) {
+              airshipData.hasTarget = false;
+            } else {
+              airshipData.targetLat = tlt;
+              airshipData.targetLng = tlg;
+            }
+          }
+
+          airshipData.autopilotEnabled = safeBool("apl");
+          airshipData.fastBrakeEnabled = safeBool("fbr");
+
+          const vst = safeInt("vst", 0);
+          airshipData.virtualStartTime = vst > 0 ? vst * 1000 : Date.now();
+          airshipData.virtualElapsedSeconds = safeFloat("vel", 0);
+          airshipData.lastUpdate = Date.now();
+
+          if (airshipMarker) map.removeLayer(airshipMarker);
+          airshipMarker = L.marker([lat, lng], {
+            icon: L.divIcon({ className: "" }),
+          }).addTo(map);
+
+          if (airshipData.hasTarget) {
+            setTarget(airshipData.targetLat, airshipData.targetLng);
+          }
+
+          updateAirshipIcon();
+          updateDisplays();
+          updateStats();
+          startAutoSave();
+
+          document.getElementById("controls").style.display = "flex";
+          document.getElementById("toggleControlsBtn").style.display = "block";
+          document.getElementById("stats").style.display = "block";
+
+          gameStarted = true;
+          awaitingSpawn = false;
+          document.getElementById("start-menu").style.display = "none";
+          return true;
+        } catch (e) {
+          console.warn("Ошибка при загрузке из URL:", e);
+          return false;
+        }
+      }
+
       function loadSavedState() {
-        const saved = localStorage.getItem("airshipState");
-        const btnContinue = document.getElementById("btn-continue");
-        if (saved) {
-          try {
+        try {
+          const saved = localStorage.getItem("airshipState");
+          const btnContinue = document.getElementById("btn-continue");
+          if (saved) {
             const parsed = JSON.parse(saved);
-            if (parsed.lat !== undefined && parsed.lng !== undefined) {
+            if (
+              typeof parsed.lat === "number" &&
+              typeof parsed.lng === "number"
+            ) {
               btnContinue.disabled = false;
               btnContinue.onclick = () => {
-                document.getElementById("start-menu").style.display = "none";
-                spawnAirship(parsed.lat, parsed.lng);
-                Object.assign(airshipData, parsed);
-                gameStarted = true;
-                awaitingSpawn = false;
-                updateDisplays();
-                updateAirshipIcon();
-                if (airshipData.flagEnabled) {
-                  document.getElementById("flagToggle").checked = true;
-                  updateFlag();
+                try {
+                  document.getElementById("start-menu").style.display = "none";
+                  spawnAirship(parsed.lat, parsed.lng);
+                  Object.assign(airshipData, parsed);
+                  gameStarted = true;
+                  awaitingSpawn = false;
+
+                  document.getElementById("controls").style.display = "flex";
+                  document.getElementById("toggleControlsBtn").style.display =
+                    "block";
+                  document.getElementById("stats").style.display = "block";
+
+                  updateDisplays();
+                  updateAirshipIcon();
+                  if (airshipData.flagEnabled) {
+                    document.getElementById("flagToggle").checked = true;
+                    updateFlag();
+                  }
+                  if (airshipData.followEnabled) {
+                    document.getElementById("followToggle").checked = true;
+                  }
+                  if (airshipData.hasTarget) {
+                    setTarget(airshipData.targetLat, airshipData.targetLng);
+                  }
+                  focusOnAirship(12);
+                  startAutoSave();
+                } catch (e) {
+                  console.warn("Ошибка при загрузке из localStorage:", e);
+                  alert("Не удалось загрузить сохранение.");
                 }
-                if (airshipData.followEnabled) {
-                  document.getElementById("followToggle").checked = true;
-                }
-                if (airshipData.hasTarget) {
-                  setTarget(airshipData.targetLat, airshipData.targetLng);
-                }
-                focusOnAirship(12);
-                startAutoSave();
               };
               return;
             }
-          } catch (e) {
-            console.warn("Failed to parse saved state");
           }
+        } catch (e) {
+          console.warn("Ошибка парсинга localStorage:", e);
         }
-        btnContinue.disabled = true;
-      }
-
-      // Вспомогательная функция уведомлений
-      function showNotification(message) {
-        const notify = document.createElement("div");
-        notify.textContent = message;
-        notify.style.cssText = `
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background: #4caf50;
-      color: white;
-      padding: 8px 16px;
-      border-radius: 4px;
-      z-index: 1002;
-      opacity: 0;
-      animation: fadeOut 3s forwards;
-    `;
-        notify.style.cssText += `
-      @keyframes fadeOut {
-        0% { opacity: 1; }
-        70% { opacity: 1; }
-        100% { opacity: 0; }
-      }
-    `;
-        document.body.appendChild(notify);
-        setTimeout(() => {
-          if (notify.parentNode) notify.parentNode.removeChild(notify);
-        }, 3000);
+        document.getElementById("btn-continue").disabled = true;
       }
 
       const timeWarpSlider = document.getElementById("timeWarpSlider");
@@ -1116,19 +1232,32 @@
         updateDisplays();
       });
 
-      const zoomScaleSlider = document.getElementById("zoomScaleSlider");
-      const zoomScaleValue = document.getElementById("zoomScaleValue");
+      let zoomDebounceTimer = null;
+
       zoomScaleSlider.addEventListener("input", () => {
+        // Отменяем предыдущий таймер
+        if (zoomDebounceTimer) {
+          clearTimeout(zoomDebounceTimer);
+        }
+
+        // Запоминаем новое значение
         currentZoomScaleIndex = parseInt(zoomScaleSlider.value);
-        const zoomLevel = ZOOM_SCALE_LEVELS[currentZoomScaleIndex];
-        map.setZoom(zoomLevel);
+
+        // Обновляем отображение немедленно
         updateDisplays();
+
+        // Откладываем установку масштаба на 500 мс
+        zoomDebounceTimer = setTimeout(() => {
+          const zoomLevel = ZOOM_SCALE_LEVELS[currentZoomScaleIndex];
+          map.setZoom(zoomLevel);
+          zoomDebounceTimer = null;
+        }, 100);
       });
 
       document.getElementById("pauseBtn").addEventListener("click", () => {
         isPaused = !isPaused;
         updateDisplays();
-        startAutoSave(); // ← автосохранение при паузе
+        startAutoSave();
       });
 
       const rudderSlider = document.getElementById("rudderSlider");
@@ -1163,15 +1292,6 @@
         });
 
       document
-        .getElementById("autoSkipToggle")
-        .addEventListener("change", function () {
-          airshipData.autoSkipEnabled = this.checked;
-          if (airshipData.autoSkipEnabled) {
-            airshipData.autoSkipTargetSeconds = 86400;
-          }
-        });
-
-      document
         .getElementById("flagToggle")
         .addEventListener("change", function () {
           airshipData.flagEnabled = this.checked;
@@ -1195,88 +1315,6 @@
           }
         });
 
-      // 🔥 ИСПРАВЛЕНО: копирование и вставка
-      document.getElementById("savePosBtn").addEventListener("click", () => {
-        const pos = JSON.stringify({
-          lat: airshipData.lat,
-          lng: airshipData.lng,
-          heading: airshipData.heading,
-        });
-
-        if (navigator.clipboard && window.isSecureContext) {
-          navigator.clipboard
-            .writeText(pos)
-            .then(() => {
-              showNotification("Позиция сохранена!");
-            })
-            .catch((err) => {
-              console.error("Clipboard error:", err);
-              // Fallback
-              const textArea = document.createElement("textarea");
-              textArea.value = pos;
-              textArea.style.position = "fixed";
-              textArea.style.left = "-9999px";
-              document.body.appendChild(textArea);
-              textArea.select();
-              try {
-                document.execCommand("copy");
-                showNotification("Позиция скопирована!");
-              } catch (err2) {
-                alert("Скопируйте вручную: " + pos);
-              }
-              document.body.removeChild(textArea);
-            });
-        } else {
-          // Fallback для HTTP
-          const textArea = document.createElement("textarea");
-          textArea.value = pos;
-          textArea.style.position = "fixed";
-          textArea.style.left = "-9999px";
-          document.body.appendChild(textArea);
-          textArea.select();
-          try {
-            document.execCommand("copy");
-            showNotification("Позиция скопирована!");
-          } catch (err) {
-            alert("Скопируйте вручную: " + pos);
-          }
-          document.body.removeChild(textArea);
-        }
-      });
-
-      document
-        .getElementById("loadPosBtn")
-        .addEventListener("click", async () => {
-          let text = "";
-          try {
-            if (navigator.clipboard && window.isSecureContext) {
-              text = await navigator.clipboard.readText();
-            } else {
-              // Fallback: ввод вручную
-              text = prompt("Вставьте данные позиции:");
-              if (!text) return;
-            }
-
-            const pos = JSON.parse(text);
-            if (typeof pos.lat === "number" && typeof pos.lng === "number") {
-              airshipData.lat = pos.lat;
-              airshipData.lng = pos.lng;
-              if (typeof pos.heading === "number")
-                airshipData.heading = pos.heading;
-              airshipMarker.setLatLng([pos.lat, pos.lng]);
-              if (flagMarker) flagMarker.setLatLng([pos.lat, pos.lng]);
-              updateAirshipIcon();
-              if (airshipData.hasTarget) updateDirectionArrow();
-              focusOnAirship(12);
-              showNotification("Позиция загружена!");
-            } else {
-              throw new Error("Invalid format");
-            }
-          } catch (e) {
-            alert("Неверный формат позиции в буфере!");
-          }
-        });
-
       document.getElementById("syncTimeBtn").addEventListener("click", () => {
         if (!airshipData.virtualStartTime) return;
 
@@ -1287,11 +1325,11 @@
         if (Math.abs(diffMs) > 1000) {
           const diffSec = Math.abs(diffMs) / 1000;
           skipSimulationTime(diffSec);
-          showNotification(
+          alert(
             `Синхронизация завершена! Пропущено ${Math.round(diffSec)} сек.`,
           );
         } else {
-          showNotification("Синхронизация не требуется.");
+          alert("Синхронизация не требуется.");
         }
       });
 
@@ -1309,6 +1347,13 @@
       });
 
       document.getElementById("coalBtn").addEventListener("click", loadCoal);
+
+      document.getElementById("newGameBtn").addEventListener("click", () => {
+        if (confirm("Вы уверены? Текущий полёт будет сброшен.")) {
+          window.history.replaceState(null, "", window.location.pathname);
+          location.reload();
+        }
+      });
 
       document
         .getElementById("toggleControlsBtn")
@@ -1343,19 +1388,6 @@
 
         if (airshipData.autopilotEnabled) {
           runAutopilot();
-        }
-
-        if (
-          airshipData.autoSkipEnabled &&
-          timeWarpFactor > 1 &&
-          airshipData.autoSkipTargetSeconds > 0
-        ) {
-          const secondsPassed = dtSimulated;
-          airshipData.autoSkipTargetSeconds -= secondsPassed;
-          if (airshipData.autoSkipTargetSeconds <= 0) {
-            airshipData.autoSkipEnabled = false;
-            document.getElementById("autoSkipToggle").checked = false;
-          }
         }
 
         const currentSign = Math.sign(airshipData.enginePower);
@@ -1523,6 +1555,7 @@
         updateDisplays();
         updateAirshipIcon();
         updateStats();
+        updateUrl();
       }
 
       map.on("click", (e) => {
@@ -1543,7 +1576,10 @@
         awaitingSpawn = true;
       };
 
-      loadSavedState();
+      if (!loadFromUrl()) {
+        loadSavedState();
+      }
+
       setInterval(simulateStep, 50);
     </script>
   </body>
