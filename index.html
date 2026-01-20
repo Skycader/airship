@@ -1,1207 +1,1415 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Симулятор дирижабля «Гитэнюург»</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      overflow: hidden;
-      font-family: 'Segoe UI', Tahoma, sans-serif;
-      background: #000;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Симулятор дирижабля «Гитэнюург»</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        background: #000;
+      }
 
-    #map {
-      height: 100%;
-      width: 100%;
-    }
+      #map {
+        height: 100%;
+        width: 100%;
+      }
 
-    #start-menu {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.9);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 2000;
-      color: white;
-    }
+      #start-menu {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 2000;
+        color: white;
+      }
 
-    #start-menu h1 {
-      font-size: 28px;
-      margin-bottom: 30px;
-      color: #4fc3f7;
-    }
+      #start-menu h1 {
+        font-size: 28px;
+        margin-bottom: 30px;
+        color: #4fc3f7;
+      }
 
-    #start-menu button {
-      padding: 12px 30px;
-      font-size: 18px;
-      margin: 10px;
-      background: #1e88e5;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
+      #start-menu button {
+        padding: 12px 30px;
+        font-size: 18px;
+        margin: 10px;
+        background: #1e88e5;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
 
-    #start-menu button:hover {
-      background: #1976d2;
-    }
+      #start-menu button:hover {
+        background: #1976d2;
+      }
 
-    #start-menu button:disabled {
-      background: #555;
-      cursor: not-allowed;
-    }
+      #start-menu button:disabled {
+        background: #555;
+        cursor: not-allowed;
+      }
 
-    #controls {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: rgba(0, 0, 0, 0.85);
-      color: white;
-      padding: 12px;
-      display: none;
-      justify-content: space-around;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 15px;
-      z-index: 1000;
-      pointer-events: auto;
-    }
+      #controls {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.85);
+        color: white;
+        padding: 12px;
+        display: none;
+        justify-content: space-around;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+        z-index: 1000;
+        pointer-events: auto;
+      }
 
-    .control-group {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      color: white;
-      min-width: 120px;
-    }
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        color: white;
+        min-width: 120px;
+      }
 
-    .slider {
-      width: 100px;
-      margin: 5px 0;
-    }
+      .slider {
+        width: 100px;
+        margin: 5px 0;
+      }
 
-    .label {
-      font-size: 13px;
-      margin-top: 4px;
-      color: #aaa;
-    }
+      .label {
+        font-size: 13px;
+        margin-top: 4px;
+        color: #aaa;
+      }
 
-    .value-display {
-      font-size: 16px;
-      font-weight: bold;
-      color: #0ff;
-      margin-top: 2px;
-    }
+      .value-display {
+        font-size: 16px;
+        font-weight: bold;
+        color: #0ff;
+        margin-top: 2px;
+      }
 
-    .speed-display {
-      font-size: 18px;
-      font-weight: bold;
-      color: #0f0;
-    }
+      .speed-display {
+        font-size: 18px;
+        font-weight: bold;
+        color: #0f0;
+      }
 
-    .flag-control {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
+      .flag-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
 
-    .skip-control {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-width: 120px;
-    }
+      .skip-control {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 120px;
+      }
 
-    .skip-input {
-      width: 80px;
-      padding: 4px;
-      text-align: center;
-      font-size: 14px;
-    }
+      .skip-input {
+        width: 80px;
+        padding: 4px;
+        text-align: center;
+        font-size: 14px;
+      }
 
-    .skip-btn, .offline-btn, .coal-btn, .pause-btn {
-      margin-top: 4px;
-      padding: 4px 10px;
-      font-size: 12px;
-      background: #555;
-      color: white;
-      border: none;
-      border-radius: 3px;
-      cursor: pointer;
-    }
+      .skip-btn,
+      .offline-btn,
+      .coal-btn,
+      .pause-btn {
+        margin-top: 4px;
+        padding: 4px 10px;
+        font-size: 12px;
+        background: #555;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+      }
 
-    .skip-btn:hover, .offline-btn:hover, .coal-btn:hover, .pause-btn:hover {
-      background: #777;
-    }
+      .skip-btn:hover,
+      .offline-btn:hover,
+      .coal-btn:hover,
+      .pause-btn:hover {
+        background: #777;
+      }
 
-    #toggleControlsBtn {
-      position: fixed;
-      bottom: 10px;
-      right: 10px;
-      width: 40px;
-      height: 40px;
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      border: none;
-      border-radius: 50%;
-      font-size: 20px;
-      cursor: pointer;
-      z-index: 1001;
-      display: none;
-    }
+      #toggleControlsBtn {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        width: 40px;
+        height: 40px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        font-size: 20px;
+        cursor: pointer;
+        z-index: 1001;
+        display: none;
+      }
 
-    #stats {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 14px;
-      z-index: 1001;
-      pointer-events: none;
-    }
+      #stats {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        z-index: 1001;
+        pointer-events: none;
+      }
 
-    .leaflet-div-icon {
-      overflow: visible !important;
-    }
-  </style>
-</head>
-<body>
+      .leaflet-div-icon {
+        overflow: visible !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
 
-<div id="map"></div>
+    <div id="start-menu">
+      <h1>Симулятор дирижабля «Гитэнюург»</h1>
+      <button id="btn-new">Начать новую игру</button>
+      <button id="btn-continue" disabled>Продолжить</button>
+    </div>
 
-<div id="start-menu">
-  <h1>Симулятор дирижабля «Гитэнюург»</h1>
-  <button id="btn-new">Начать новую игру</button>
-  <button id="btn-continue" disabled>Продолжить</button>
-</div>
+    <div id="controls">
+      <div class="control-group">
+        <input
+          type="range"
+          min="-5"
+          max="5"
+          value="0"
+          step="1"
+          class="slider"
+          id="rudderSlider"
+        />
+        <div class="value-display" id="rudderValue">0.0°</div>
+        <div class="label">Штурвал (±0.5°)</div>
+      </div>
 
-<div id="controls">
-  <div class="control-group">
-    <input type="range" min="-5" max="5" value="0" step="1" class="slider" id="rudderSlider" />
-    <div class="value-display" id="rudderValue">0.0°</div>
-    <div class="label">Штурвал (±0.5°)</div>
-  </div>
+      <div class="control-group">
+        <input
+          type="range"
+          min="-5"
+          max="5"
+          value="0"
+          step="1"
+          class="slider"
+          id="throttleSlider"
+        />
+        <div class="value-display" id="throttleValue">STOP</div>
+        <div class="label">Мощность двигателей</div>
+      </div>
 
-  <div class="control-group">
-    <input type="range" min="-5" max="5" value="0" step="1" class="slider" id="throttleSlider" />
-    <div class="value-display" id="throttleValue">STOP</div>
-    <div class="label">Мощность двигателей</div>
-  </div>
+      <div class="control-group">
+        <label
+          ><input type="checkbox" id="fastBrakeToggle" /> Быстрое
+          торможение</label
+        >
+      </div>
 
-  <div class="control-group">
-    <label><input type="checkbox" id="fastBrakeToggle" /> Быстрое торможение</label>
-  </div>
+      <div class="control-group">
+        <div class="speed-display" id="speedometer">0 км/ч</div>
+        <div class="label">Скорость</div>
+      </div>
 
-  <div class="control-group">
-    <div class="speed-display" id="speedometer">0 км/ч</div>
-    <div class="label">Скорость</div>
-  </div>
+      <div class="control-group">
+        <div class="value-display" id="enginePowerDisplay">0%</div>
+        <div class="label">Мощность двигателей</div>
+      </div>
 
-  <div class="control-group">
-    <div class="value-display" id="enginePowerDisplay">0%</div>
-    <div class="label">Мощность двигателей</div>
-  </div>
+      <div class="control-group">
+        <div class="value-display" id="compass">0° (0°)</div>
+        <div class="label">Курс (откл.)</div>
+      </div>
 
-  <div class="control-group">
-    <div class="value-display" id="compass">0° (0°)</div>
-    <div class="label">Курс (откл.)</div>
-  </div>
+      <div class="control-group">
+        <input
+          type="range"
+          id="timeWarpSlider"
+          class="slider"
+          min="0"
+          max="14"
+          step="1"
+          value="1"
+        />
+        <div class="value-display" id="timeWarpValue">1x</div>
+        <div class="label">Ускорение времени</div>
+      </div>
 
-  <div class="control-group">
-    <input type="range" id="timeWarpSlider" class="slider" min="0" max="14" step="1" value="1" />
-    <div class="value-display" id="timeWarpValue">1x</div>
-    <div class="label">Ускорение времени</div>
-  </div>
+      <div class="control-group">
+        <button id="pauseBtn" class="pause-btn">⏸️</button>
+        <div class="label">Пауза</div>
+      </div>
 
-  <div class="control-group">
-    <button id="pauseBtn" class="pause-btn">⏸️</button>
-    <div class="label">Пауза</div>
-  </div>
+      <div class="skip-control">
+        <input
+          type="number"
+          id="skipDaysInput"
+          class="skip-input"
+          value="1"
+          min="0.1"
+          step="0.1"
+        />
+        <button id="skipBtn" class="skip-btn">Пропустить</button>
+        <div class="label">Дней</div>
+      </div>
 
-  <div class="skip-control">
-    <input type="number" id="skipDaysInput" class="skip-input" value="1" min="0.1" step="0.1" />
-    <button id="skipBtn" class="skip-btn">Пропустить</button>
-    <div class="label">Дней</div>
-  </div>
+      <div class="control-group flag-control">
+        <label><input type="checkbox" id="flagToggle" /> Флаг</label>
+        <label><input type="checkbox" id="followToggle" /> Следовать</label>
+        <label><input type="checkbox" id="autopilotToggle" /> Автопилот</label>
+        <button id="focusBtn">К дирижаблю</button>
+        <button id="targetBtn">Добавить маркер</button>
+        <button id="offlineBtn" class="offline-btn">
+          Начать оффлайн-полёт
+        </button>
+        <button id="coalBtn" class="coal-btn">Загрузить уголь</button>
+      </div>
+    </div>
 
-  <div class="control-group flag-control">
-    <label><input type="checkbox" id="flagToggle" /> Флаг</label>
-    <label><input type="checkbox" id="followToggle" /> Следовать</label>
-    <label><input type="checkbox" id="autopilotToggle" /> Автопилот</label>
-    <button id="focusBtn">К дирижаблю</button>
-    <button id="targetBtn">Добавить маркер</button>
-    <button id="offlineBtn" class="offline-btn">Начать оффлайн-полёт</button>
-    <button id="coalBtn" class="coal-btn">Загрузить уголь</button>
-  </div>
-</div>
+    <button id="toggleControlsBtn">^</button>
 
-<button id="toggleControlsBtn">^</button>
+    <div id="stats">
+      Пройдено: 0 км 0 м<br />Уголь: 0.000 / 0.000 кг<br />Время в пути:
+      00:00:00
+    </div>
 
-<div id="stats">Пройдено: 0 км 0 м<br>Уголь: 0.000 / 0.000 кг<br>Время в пути: 00:00:00</div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+      const map = L.map("map").setView([55.75, 37.62], 4);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
+      }).addTo(map);
 
-<script>
-  const map = L.map('map').setView([55.75, 37.62], 4);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
+      let airshipMarker = null;
+      let flagMarker = null;
+      let targetMarker = null;
+      let directionArrow = null;
 
-  let airshipMarker = null;
-  let flagMarker = null;
-  let targetMarker = null;
-  let directionArrow = null;
+      const timeSteps = [
+        0.1, // 0
+        1, // 1
+        2, // 2
+        5, // 3
+        10, // 4
+        20, // 5
+        30, // 6
+        40, // 7
+        50, // 8
+        60, // 9
+        70, // 10
+        80, // 11
+        90, // 12
+        100, // 13
+        1000, // 14
+      ];
+      let timeWarpFactor = 1;
+      let isPaused = false;
 
-  const timeSteps = [
-    0.1, // 0
-    1,   // 1
-    2,   // 2
-    5,   // 3
-    10,  // 4
-    20,  // 5
-    30,  // 6
-    40,  // 7
-    50,  // 8
-    60,  // 9
-    70,  // 10
-    80,  // 11
-    90,  // 12
-    100, // 13
-    1000 // 14
-  ];
-  let timeWarpFactor = 1;
-  let isPaused = false;
+      // 🔥 НОВЫЕ КОНСТАНТЫ УГЛЯ
+      const MAX_COAL_RESERVE = 900000; // кг
+      const COAL_CONSUMPTION_RATE = 0.001; // 1 кг/мин на 1% мощности
 
-  const MAX_COAL_RESERVE = 1000;
-  const ENGINE_POWER_RATE = 1.0;
-  const MAX_SPEED = 135;
-  const ACCELERATION_FORWARD = 0.08;
-  const ACCELERATION_REVERSE = 0.8;
-  const DECELERATION_COAST = 0.3;
-  const MAX_TURN_RATE = 3;
-  const MIN_TURN_RATE = 0.3;
-  const PROPELLER_BASE_SCALE = 4.0;
+      const ENGINE_POWER_RATE = 1.0;
+      const MAX_SPEED = 135;
+      const ACCELERATION_FORWARD = 0.08;
+      const ACCELERATION_REVERSE = 0.8;
+      const DECELERATION_COAST = 0.3;
+      const MAX_TURN_RATE = 3;
+      const MIN_TURN_RATE = 0.3;
+      const PROPELLER_BASE_SCALE = 4.0;
 
-  let airshipData = {
-    lat: 0,
-    lng: 0,
-    heading: 0,
-    speed: 0,
-    throttle: 0,
-    rudder: 0,
-    angularVelocity: 0,
-    lastUpdate: Date.now(),
-    propRotationAngle: 0,
-    flagEnabled: false,
-    followEnabled: false,
-    autopilotEnabled: false,
-    fastBrakeEnabled: false,
-    startTime: null,
-    totalDistanceMeters: 0,
-    coalReserve: 0,
-    totalCoalBurned: 0,
-    hasTarget: false,
-    targetLat: null,
-    targetLng: null,
-    virtualElapsedSeconds: 0,
-    offlineStartTime: null,
-    enginePower: 0,
-    engineReversing: false
-  };
+      let airshipData = {
+        lat: 0,
+        lng: 0,
+        heading: 0,
+        speed: 0,
+        throttle: 0,
+        rudder: 0,
+        angularVelocity: 0,
+        lastUpdate: Date.now(),
+        propRotationAngle: 0,
+        flagEnabled: false,
+        followEnabled: false,
+        autopilotEnabled: false,
+        fastBrakeEnabled: false,
+        startTime: null,
+        totalDistanceMeters: 0,
+        coalReserve: 0,
+        totalCoalBurned: 0,
+        hasTarget: false,
+        targetLat: null,
+        targetLng: null,
+        virtualElapsedSeconds: 0,
+        offlineStartTime: null,
+        enginePower: 0,
+        engineReversing: false,
+      };
 
-  const throttleLabels = {
-    '-5': 'ASTERN FULL',
-    '-4': 'ASTERN HALF',
-    '-3': 'ASTERN SLOW',
-    '-2': 'ASTERN DEAD SLOW',
-    '-1': 'DEAD SLOW (astern)',
-    '0': 'STOP',
-    '1': 'DEAD SLOW',
-    '2': 'SLOW',
-    '3': 'HALF',
-    '4': 'FULL',
-    '5': 'FULL'
-  };
+      const throttleLabels = {
+        "-5": "ASTERN FULL",
+        "-4": "ASTERN HALF",
+        "-3": "ASTERN SLOW",
+        "-2": "ASTERN DEAD SLOW",
+        "-1": "DEAD SLOW (astern)",
+        0: "STOP",
+        1: "DEAD SLOW",
+        2: "SLOW",
+        3: "HALF",
+        4: "FULL",
+        5: "FULL",
+      };
 
-  function calculatePropellerRPM() {
-    if (Math.abs(airshipData.enginePower) < 0.1 || airshipData.coalReserve <= 0) return 0;
-    return airshipData.enginePower * 3 * PROPELLER_BASE_SCALE / 20;
-  }
+      function calculatePropellerRPM() {
+        if (
+          Math.abs(airshipData.enginePower) < 0.1 ||
+          airshipData.coalReserve <= 0
+        )
+          return 0;
+        return (airshipData.enginePower * 3 * PROPELLER_BASE_SCALE) / 20;
+      }
 
-  const flagIcon = L.divIcon({
-    className: '',
-    html: '🚩',
-    iconSize: [20, 24],
-    iconAnchor: [10, 24]
-  });
+      const flagIcon = L.divIcon({
+        className: "",
+        html: "🚩",
+        iconSize: [20, 24],
+        iconAnchor: [10, 24],
+      });
 
-  const targetIcon = L.divIcon({
-    className: '',
-    html: '🎯',
-    iconSize: [24, 24],
-    iconAnchor: [12, 12]
-  });
+      const targetIcon = L.divIcon({
+        className: "",
+        html: "🎯",
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+      });
 
-  function getAirshipSvg(zoom, heading, propRotationAngle) {
-    if (zoom <= 8) {
-      return `<svg viewBox="0 0 10 10" width="10" height="10">
+      function getAirshipSvg(zoom, heading, propRotationAngle) {
+        if (zoom <= 8) {
+          return `<svg viewBox="0 0 10 10" width="10" height="10">
                 <circle cx="5" cy="5" r="4" fill="#ff3300" stroke="#000" stroke-width="1"/>
               </svg>`;
-    }
+        }
 
-    const metersPerPixel = 156543.03392 * Math.cos(airshipData.lat * Math.PI / 180) / Math.pow(2, zoom);
-    const lengthPx = 500 / metersPerPixel;
-    const widthPx = lengthPx * 0.22;
+        const metersPerPixel =
+          (156543.03392 * Math.cos((airshipData.lat * Math.PI) / 180)) /
+          Math.pow(2, zoom);
+        const lengthPx = 500 / metersPerPixel;
+        const widthPx = lengthPx * 0.22;
 
-    const propSize = widthPx * 0.3;
-    const centerY = lengthPx * 0.92;
-    const offsetX = widthPx * 0.15;
-    const leftPropX = widthPx / 2 - offsetX;
-    const rightPropX = widthPx / 2 + offsetX;
+        const propSize = widthPx * 0.3;
+        const centerY = lengthPx * 0.92;
+        const offsetX = widthPx * 0.15;
+        const leftPropX = widthPx / 2 - offsetX;
+        const rightPropX = widthPx / 2 + offsetX;
 
-    return `
+        return `
       <svg viewBox="0 0 ${widthPx} ${lengthPx}" 
            width="${widthPx}" height="${lengthPx}"
            style="transform: rotate(${heading}deg); transform-origin: center;">
-        <ellipse cx="${widthPx/2}" cy="${lengthPx/2}" 
-                 rx="${widthPx/2}" ry="${lengthPx/2}" 
+        <ellipse cx="${widthPx / 2}" cy="${lengthPx / 2}" 
+                 rx="${widthPx / 2}" ry="${lengthPx / 2}" 
                  fill="#3a5ca0" stroke="#1a3a6a" stroke-width="1"/>
         <image href="https://cdn-icons-png.flaticon.com/512/166/166062.png"
-               x="${leftPropX - propSize/2}" y="${centerY - propSize/2}"
+               x="${leftPropX - propSize / 2}" y="${centerY - propSize / 2}"
                width="${propSize}" height="${propSize}"
                transform="rotate(${propRotationAngle} ${leftPropX} ${centerY})" />
         <image href="https://cdn-icons-png.flaticon.com/512/166/166062.png"
-               x="${rightPropX - propSize/2}" y="${centerY - propSize/2}"
+               x="${rightPropX - propSize / 2}" y="${centerY - propSize / 2}"
                width="${propSize}" height="${propSize}"
                transform="rotate(${-propRotationAngle} ${rightPropX} ${centerY})" />
       </svg>`;
-  }
-
-  function updateAirshipIcon() {
-    if (!airshipMarker) return;
-    const zoom = map.getZoom();
-    const svgHtml = getAirshipSvg(zoom, airshipData.heading, airshipData.propRotationAngle);
-    const newIcon = L.divIcon({ className: '', html: svgHtml, iconSize: null });
-    airshipMarker.setIcon(newIcon);
-  }
-
-  function updateFlag() {
-    const showFlag = document.getElementById('flagToggle').checked;
-    if (showFlag && airshipMarker) {
-      if (!flagMarker) {
-        flagMarker = L.marker([airshipData.lat, airshipData.lng], { icon: flagIcon }).addTo(map);
-      } else {
-        flagMarker.setLatLng([airshipData.lat, airshipData.lng]);
-      }
-    } else {
-      if (flagMarker) {
-        map.removeLayer(flagMarker);
-        flagMarker = null;
-      }
-    }
-  }
-
-  function setTarget(lat, lng) {
-    airshipData.hasTarget = true;
-    airshipData.targetLat = lat;
-    airshipData.targetLng = lng;
-    if (targetMarker) map.removeLayer(targetMarker);
-    targetMarker = L.marker([lat, lng], { icon: targetIcon }).addTo(map);
-    document.getElementById('targetBtn').textContent = 'Удалить маркер';
-    document.getElementById('autopilotToggle').disabled = false;
-    updateDirectionArrow();
-  }
-
-  function removeTarget() {
-    airshipData.hasTarget = false;
-    airshipData.targetLat = null;
-    airshipData.targetLng = null;
-    if (targetMarker) {
-      map.removeLayer(targetMarker);
-      targetMarker = null;
-    }
-    if (directionArrow) {
-      map.removeLayer(directionArrow);
-      directionArrow = null;
-    }
-    document.getElementById('targetBtn').textContent = 'Добавить маркер';
-    document.getElementById('autopilotToggle').checked = false;
-    document.getElementById('autopilotToggle').disabled = true;
-    airshipData.autopilotEnabled = false;
-  }
-
-  function updateDirectionArrow() {
-    if (!airshipData.hasTarget || !airshipMarker) return;
-    if (directionArrow) map.removeLayer(directionArrow);
-
-    const R = 6378137;
-    const lat1 = airshipData.lat * Math.PI / 180;
-    const lon1 = airshipData.lng * Math.PI / 180;
-    const lat2 = airshipData.targetLat * Math.PI / 180;
-    const lon2 = airshipData.targetLng * Math.PI / 180;
-
-    const dLon = lon2 - lon1;
-    const y = Math.sin(dLon) * Math.cos(lat2);
-    const x = Math.cos(lat1) * Math.sin(lat2) -
-              Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-    const bearing = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-
-    const dx = R * Math.cos(lat1) * Math.sin(dLon);
-    const dy = R * (Math.sin(lat2) - Math.sin(lat1));
-    const distance = Math.sqrt(dx*dx + dy*dy);
-
-    const arrowLength = 60;
-    const arrowRad = (bearing - 90) * Math.PI / 180;
-    const arrowEndX = arrowLength * Math.cos(arrowRad);
-    const arrowEndY = arrowLength * Math.sin(arrowRad);
-
-    const kmInt = Math.floor(distance / 1000);
-    const kmText = kmInt.toString().padStart(4, '0') + ' км';
-
-    const size = 200;
-    const centerX = size / 2;
-    const centerY = size / 2;
-
-    const arrowSvg = `
-      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="overflow:visible;">
-        <line x1="${centerX}" y1="${centerY}" 
-              x2="${centerX + arrowEndX}" y2="${centerY + arrowEndY}" 
-              stroke="#000" stroke-width="3" marker-end="url(#arrowhead)"/>
-        <defs>
-          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-            <polygon points="0 0, 10 3.5, 0 7" fill="#000"/>
-          </marker>
-        </defs>
-        <rect x="${centerX + arrowEndX + 5}" y="${centerY + arrowEndY - 18}" 
-              width="70" height="22" rx="5" ry="5" fill="#000" />
-        <text x="${centerX + arrowEndX + 40}" y="${centerY + arrowEndY - 5}" 
-              fill="#fff" font-size="12" text-anchor="middle" font-family="Arial">
-          ${kmText}
-        </text>
-      </svg>`;
-
-    const arrowIcon = L.divIcon({
-      className: '',
-      html: arrowSvg,
-      iconSize: [size, size],
-      iconAnchor: [centerX, centerY]
-    });
-
-    directionArrow = L.marker([airshipData.lat, airshipData.lng], { icon: arrowIcon }).addTo(map);
-  }
-
-  function focusOnAirship(optimalZoom = 12) {
-    if (airshipMarker) {
-      map.setView([airshipData.lat, airshipData.lng], optimalZoom);
-    }
-  }
-
-  function formatDistance(meters) {
-    const km = Math.floor(meters / 1000);
-    const m = Math.floor(meters % 1000);
-    return `${km} км ${m} м`;
-  }
-
-  function formatCoal(kg) {
-    return kg.toFixed(3);
-  }
-
-  function formatTime(totalSeconds) {
-    const totalSec = Math.floor(totalSeconds);
-    const days = Math.floor(totalSec / 86400);
-    const hours = Math.floor((totalSec % 86400) / 3600);
-    const minutes = Math.floor((totalSec % 3600) / 60);
-    const seconds = totalSec % 60;
-
-    if (days > 0) {
-      return `${days} дн. ${hours} ч. ${minutes} мин.`;
-    } else {
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }
-  }
-
-  function updateStats() {
-    document.getElementById('stats').innerHTML = 
-      `Пройдено: ${formatDistance(airshipData.totalDistanceMeters)}<br>` +
-      `Уголь: ${formatCoal(airshipData.totalCoalBurned)} / ${formatCoal(airshipData.coalReserve)} кг<br>` +
-      `Время в пути: ${formatTime(airshipData.virtualElapsedSeconds)}`;
-  }
-
-  function updateDisplays() {
-    rudderSlider.value = Math.round(airshipData.rudder * 10);
-    throttleSlider.value = airshipData.throttle;
-    rudderValue.textContent = airshipData.rudder.toFixed(1) + '°';
-    throttleValue.textContent = throttleLabels[airshipData.throttle] || 'STOP';
-    document.getElementById('speedometer').textContent = airshipData.speed.toFixed(1) + ' км/ч';
-    const sign = airshipData.enginePower >= 0 ? '' : '-';
-    document.getElementById('enginePowerDisplay').textContent = sign + Math.abs(Math.round(airshipData.enginePower)) + '%';
-    
-    // --- ОТКЛОНЕНИЕ ОТ КУРСА ---
-    let courseDeviation = 0;
-    if (airshipData.hasTarget) {
-      const R = 6378137;
-      const lat1 = airshipData.lat * Math.PI / 180;
-      const lon1 = airshipData.lng * Math.PI / 180;
-      const lat2 = airshipData.targetLat * Math.PI / 180;
-      const lon2 = airshipData.targetLng * Math.PI / 180;
-      const dLon = lon2 - lon1;
-      const y = Math.sin(dLon) * Math.cos(lat2);
-      const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-      const bearingToTarget = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-      courseDeviation = bearingToTarget - airshipData.heading;
-      if (courseDeviation > 180) courseDeviation -= 360;
-      if (courseDeviation < -180) courseDeviation += 360;
-    }
-    document.getElementById('compass').textContent = `${Math.round(airshipData.heading)}° (${Math.abs(Math.round(courseDeviation))}°)`;
-    
-    document.getElementById('timeWarpValue').textContent = timeWarpFactor + 'x';
-    document.getElementById('pauseBtn').textContent = isPaused ? '▶️' : '⏸️';
-    document.getElementById('autopilotToggle').checked = airshipData.autopilotEnabled;
-    document.getElementById('fastBrakeToggle').checked = airshipData.fastBrakeEnabled;
-  }
-
-  // 🔥 УЛУЧШЕННЫЙ АВТОПИЛОТ
-  function runAutopilot() {
-    if (!airshipData.hasTarget || !airshipData.autopilotEnabled || airshipData.coalReserve <= 0) return;
-
-    const R = 6378137;
-    const lat1 = airshipData.lat * Math.PI / 180;
-    const lon1 = airshipData.lng * Math.PI / 180;
-    const lat2 = airshipData.targetLat * Math.PI / 180;
-    const lon2 = airshipData.targetLng * Math.PI / 180;
-
-    const dLon = lon2 - lon1;
-    const y = Math.sin(dLon) * Math.cos(lat2);
-    const x = Math.cos(lat1) * Math.sin(lat2) -
-              Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-    const bearingToTarget = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-
-    const dx = R * Math.cos(lat1) * Math.sin(dLon);
-    const dy = R * (Math.sin(lat2) - Math.sin(lat1));
-    const distanceToTarget = Math.sqrt(dx*dx + dy*dy); // метры
-
-    // --- УПРАВЛЕНИЕ КУРСОМ ---
-    let headingError = bearingToTarget - airshipData.heading;
-    if (headingError > 180) headingError -= 360;
-    if (headingError < -180) headingError += 360;
-
-    let rudderCommand = headingError * 0.01;
-    rudderCommand = Math.max(-0.5, Math.min(0.5, rudderCommand));
-    airshipData.rudder = rudderCommand;
-
-    // --- ТОЧНОЕ ТОРМОЖЕНИЕ ---
-    const speedMs = airshipData.speed / 3.6; // км/ч → м/с
-    const decel = ACCELERATION_REVERSE / 3.6; // км/ч/с → м/с²
-    const brakingDistance = (speedMs * speedMs) / (2 * decel); // s = v²/(2a)
-
-    let throttleCommand = 0;
-    if (distanceToTarget < 100) {
-      throttleCommand = 0; // стоп
-    } else if (distanceToTarget < brakingDistance + 500) {
-      // Начинаем тормозить заранее + запас 500 м
-      throttleCommand = -5;
-    } else {
-      throttleCommand = 5; // полный ход
-    }
-
-    airshipData.throttle = Math.round(throttleCommand);
-    document.getElementById('rudderSlider').value = Math.round(rudderCommand * 10);
-    document.getElementById('throttleSlider').value = airshipData.throttle;
-  }
-
-  function skipSimulationTime(secondsToSkip) {
-    if (!airshipMarker || secondsToSkip <= 0) return;
-
-    const simulatedSeconds = secondsToSkip * timeWarpFactor;
-
-    let currentLat = airshipData.lat;
-    let currentLng = airshipData.lng;
-    let currentHeading = airshipData.heading;
-    let currentSpeed = airshipData.speed;
-    let currentAngularVel = airshipData.angularVelocity;
-    let currentPropAngle = airshipData.propRotationAngle;
-    let coalBurned = 0;
-    let currentEnginePower = airshipData.enginePower;
-    let currentCoalReserve = airshipData.coalReserve;
-    let currentThrottle = airshipData.throttle;
-
-    let remaining = simulatedSeconds;
-    const step = 1;
-    while (remaining > 0 && currentCoalReserve > 0) {
-      const dt = Math.min(step, remaining);
-      remaining -= dt;
-
-      // Быстрое торможение
-      if (airshipData.fastBrakeEnabled && currentSpeed > 5) {
-        currentThrottle = -5;
-      } else if (currentSpeed <= 5 && airshipData.fastBrakeEnabled) {
-        airshipData.fastBrakeEnabled = false;
-        document.getElementById('fastBrakeToggle').checked = false;
-        currentThrottle = 0;
       }
 
-      // Автопилот
-      if (airshipData.autopilotEnabled && airshipData.hasTarget) {
-        const R = 6378137;
-        const lat1 = currentLat * Math.PI / 180;
-        const lon1 = currentLng * Math.PI / 180;
-        const lat2 = airshipData.targetLat * Math.PI / 180;
-        const lon2 = airshipData.targetLng * Math.PI / 180;
-        const dLon = lon2 - lon1;
-        const dx = R * Math.cos(lat1) * Math.sin(dLon);
-        const dy = R * (Math.sin(lat2) - Math.sin(lat1));
-        const distanceToTarget = Math.sqrt(dx*dx + dy*dy);
-        const speedMs = Math.abs(currentSpeed) / 3.6;
-        const decel = ACCELERATION_REVERSE / 3.6;
-        const brakingDistance = (speedMs * speedMs) / (2 * decel);
-        if (distanceToTarget < 100) {
-          currentThrottle = 0;
-        } else if (distanceToTarget < brakingDistance + 500) {
-          currentThrottle = -5;
+      function updateAirshipIcon() {
+        if (!airshipMarker) return;
+        const zoom = map.getZoom();
+        const svgHtml = getAirshipSvg(
+          zoom,
+          airshipData.heading,
+          airshipData.propRotationAngle,
+        );
+        const newIcon = L.divIcon({
+          className: "",
+          html: svgHtml,
+          iconSize: null,
+        });
+        airshipMarker.setIcon(newIcon);
+      }
+
+      function updateFlag() {
+        const showFlag = document.getElementById("flagToggle").checked;
+        if (showFlag && airshipMarker) {
+          if (!flagMarker) {
+            flagMarker = L.marker([airshipData.lat, airshipData.lng], {
+              icon: flagIcon,
+            }).addTo(map);
+          } else {
+            flagMarker.setLatLng([airshipData.lat, airshipData.lng]);
+          }
         } else {
-          currentThrottle = 5;
+          if (flagMarker) {
+            map.removeLayer(flagMarker);
+            flagMarker = null;
+          }
         }
       }
 
-      const currentSign = Math.sign(currentEnginePower);
-      const targetSign = Math.sign(currentThrottle);
-
-      if (currentSign !== targetSign && currentEnginePower !== 0) {
-        if (currentEnginePower > 0) {
-          currentEnginePower = Math.max(0, currentEnginePower - ENGINE_POWER_RATE * dt);
-        } else {
-          currentEnginePower = Math.min(0, currentEnginePower + ENGINE_POWER_RATE * dt);
-        }
-        if (Math.abs(currentEnginePower) <= 0.1) {
-          currentEnginePower = 0;
-        }
-      } else {
-        const targetEnginePower = currentThrottle * 20;
-        if (currentEnginePower < targetEnginePower) {
-          currentEnginePower = Math.min(targetEnginePower, currentEnginePower + ENGINE_POWER_RATE * dt);
-        } else if (currentEnginePower > targetEnginePower) {
-          currentEnginePower = Math.max(targetEnginePower, currentEnginePower - ENGINE_POWER_RATE * dt);
-        }
-      }
-
-      if (currentThrottle !== 0 && currentEnginePower !== 0) {
-        const coalRateKgPerMin = Math.abs(currentEnginePower) / 20;
-        const coalRateKgPerSec = coalRateKgPerMin / 60;
-        const coalUsed = coalRateKgPerSec * dt;
-        if (currentCoalReserve >= coalUsed) {
-          currentCoalReserve -= coalUsed;
-          coalBurned += coalUsed;
-        } else {
-          currentThrottle = 0;
-          currentEnginePower = 0;
-        }
-      }
-
-      const currentThrust = currentEnginePower / 100;
-      let targetSpeed = currentThrust * MAX_SPEED;
-
-      if (Math.abs(currentSpeed - targetSpeed) > 0.01) {
-        let acceleration = ACCELERATION_FORWARD;
-        if (Math.abs(currentEnginePower) < 0.1) {
-          acceleration = DECELERATION_COAST;
-        } else if (
-          (currentEnginePower < 0 && currentSpeed > 0) ||
-          (currentEnginePower > 0 && currentSpeed < 0)
-        ) {
-          acceleration = ACCELERATION_REVERSE;
-        }
-
-        if (currentSpeed < targetSpeed) {
-          currentSpeed = Math.min(targetSpeed, currentSpeed + acceleration * dt);
-        } else {
-          currentSpeed = Math.max(targetSpeed, currentSpeed - acceleration * dt);
-        }
-      } else {
-        currentSpeed = targetSpeed;
-      }
-
-      if (Math.abs(currentEnginePower) < 0.1 && Math.abs(currentSpeed) > 0.1) {
-        const drag = DECELERATION_COAST * dt;
-        if (currentSpeed > 0) {
-          currentSpeed = Math.max(0, currentSpeed - drag);
-        } else {
-          currentSpeed = Math.min(0, currentSpeed + drag);
-        }
-      }
-
-      if (Math.abs(currentSpeed) > 0.1) {
-        const turnRate = MIN_TURN_RATE + (Math.abs(currentSpeed) / MAX_SPEED) * (MAX_TURN_RATE - MIN_TURN_RATE);
-        const targetAngularVelocity = airshipData.rudder * turnRate;
-        const angularAccel = 0.5;
-        if (currentAngularVel < targetAngularVelocity) {
-          currentAngularVel = Math.min(targetAngularVelocity, currentAngularVel + angularAccel * dt);
-        } else if (currentAngularVel > targetAngularVelocity) {
-          currentAngularVel = Math.max(targetAngularVelocity, currentAngularVel - angularAccel * dt);
-        }
-        currentHeading += currentAngularVel * dt;
-        currentHeading = ((currentHeading % 360) + 360) % 360;
-      } else {
-        currentAngularVel *= 0.95;
-        if (Math.abs(currentAngularVel) < 0.01) currentAngularVel = 0;
-      }
-
-      if (Math.abs(currentSpeed) > 0.1) {
-        const distanceKm = (Math.abs(currentSpeed) * dt) / 3600;
-        const distanceMeters = distanceKm * 1000;
-        airshipData.totalDistanceMeters += distanceMeters;
-
-        const headingRad = (currentHeading * Math.PI) / 180;
-        const dx = distanceMeters * Math.sin(headingRad) * Math.sign(currentSpeed);
-        const dy = distanceMeters * Math.cos(headingRad) * Math.sign(currentSpeed);
-        const earthRadius = 6378137;
-        currentLat += (dy / earthRadius) * (180 / Math.PI);
-        currentLng += (dx / earthRadius) * (180 / Math.PI) / Math.cos(currentLat * Math.PI / 180);
-      }
-    }
-
-    airshipData.lat = currentLat;
-    airshipData.lng = currentLng;
-    airshipData.heading = currentHeading;
-    airshipData.speed = currentSpeed;
-    airshipData.angularVelocity = currentAngularVel;
-    airshipData.propRotationAngle = currentPropAngle;
-    airshipData.totalCoalBurned += coalBurned;
-    airshipData.coalReserve = currentCoalReserve;
-    airshipData.enginePower = currentEnginePower;
-    airshipData.virtualElapsedSeconds += secondsToSkip;
-    airshipData.lastUpdate = Date.now();
-
-    if (airshipData.coalReserve <= 0) {
-      airshipData.throttle = 0;
-      airshipData.enginePower = 0;
-    }
-  }
-
-  function skipDays(days) {
-    if (!airshipMarker || days <= 0) return;
-    const secondsToSkip = days * 24 * 3600;
-    skipSimulationTime(secondsToSkip);
-    airshipMarker.setLatLng([airshipData.lat, airshipData.lng]);
-    if (flagMarker) flagMarker.setLatLng([airshipData.lat, airshipData.lng]);
-    updateAirshipIcon();
-    if (airshipData.hasTarget) updateDirectionArrow();
-    updateDisplays();
-    updateStats();
-  }
-
-  function performOfflineFlight() {
-    if (!airshipMarker) return;
-
-    const now = Date.now();
-    if (airshipData.offlineStartTime === null) {
-      airshipData.offlineStartTime = now;
-      document.getElementById('offlineBtn').textContent = 'Совершить оффлайн-полёт';
-      localStorage.setItem('airshipState', JSON.stringify(airshipData));
-      alert('Оффлайн-полёт начат. Вернитесь позже и нажмите эту кнопку снова.');
-    } else {
-      const elapsedRealMs = now - airshipData.offlineStartTime;
-      const elapsedRealSec = elapsedRealMs / 1000;
-      airshipData.offlineStartTime = null;
-      document.getElementById('offlineBtn').textContent = 'Начать оффлайн-полёт';
-
-      skipSimulationTime(elapsedRealSec);
-
-      airshipMarker.setLatLng([airshipData.lat, airshipData.lng]);
-      if (flagMarker) flagMarker.setLatLng([airshipData.lat, airshipData.lng]);
-      updateAirshipIcon();
-      if (airshipData.hasTarget) updateDirectionArrow();
-      updateDisplays();
-      updateStats();
-      localStorage.setItem('airshipState', JSON.stringify(airshipData));
-      alert(`Пропущено ${elapsedRealSec.toFixed(1)} секунд реального времени.`);
-    }
-  }
-
-  function loadCoal() {
-    const add = parseFloat(prompt("Сколько кг угля загрузить?", "100"));
-    if (!isNaN(add) && add > 0) {
-      airshipData.coalReserve += add;
-      updateStats();
-      localStorage.setItem('airshipState', JSON.stringify(airshipData));
-    }
-  }
-
-  let gameStarted = false;
-  let awaitingSpawn = false;
-  let awaitingTarget = false;
-
-  function spawnAirship(lat, lng) {
-    if (gameStarted || !lat || !lng) return;
-    gameStarted = true;
-    awaitingSpawn = false;
-
-    if (airshipMarker) map.removeLayer(airshipMarker);
-    airshipMarker = L.marker([lat, lng], { icon: L.divIcon({ className: '' }) }).addTo(map);
-    Object.assign(airshipData, {
-      lat, lng,
-      heading: 0,
-      speed: 0,
-      throttle: 0,
-      rudder: 0,
-      angularVelocity: 0,
-      lastUpdate: Date.now(),
-      propRotationAngle: 0,
-      flagEnabled: false,
-      followEnabled: false,
-      autopilotEnabled: false,
-      fastBrakeEnabled: false,
-      startTime: Date.now(),
-      totalDistanceMeters: 0,
-      coalReserve: 500,
-      totalCoalBurned: 0,
-      hasTarget: false,
-      targetLat: null,
-      targetLng: null,
-      virtualElapsedSeconds: 0,
-      offlineStartTime: null,
-      enginePower: 0,
-      engineReversing: false
-    });
-
-    document.getElementById('controls').style.display = 'flex';
-    document.getElementById('toggleControlsBtn').style.display = 'block';
-    document.getElementById('stats').style.display = 'block';
-    document.getElementById('offlineBtn').textContent = 'Начать оффлайн-полёт';
-    document.getElementById('autopilotToggle').disabled = true;
-
-    updateDisplays();
-    updateAirshipIcon();
-    updateFlag();
-    updateStats();
-    startAutoSave();
-  }
-
-  let autoSaveInterval = null;
-  function startAutoSave() {
-    if (autoSaveInterval) clearInterval(autoSaveInterval);
-    autoSaveInterval = setInterval(() => {
-      if (airshipMarker) {
-        localStorage.setItem('airshipState', JSON.stringify(airshipData));
-      }
-    }, 10000);
-  }
-
-  function loadSavedState() {
-    const saved = localStorage.getItem('airshipState');
-    const btnContinue = document.getElementById('btn-continue');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.lat !== undefined && parsed.lng !== undefined) {
-          btnContinue.disabled = false;
-          btnContinue.onclick = () => {
-            document.getElementById('start-menu').style.display = 'none';
-            spawnAirship(parsed.lat, parsed.lng);
-            Object.assign(airshipData, parsed);
-            gameStarted = true;
-            awaitingSpawn = false;
-            updateDisplays();
-            updateAirshipIcon();
-            if (airshipData.flagEnabled) {
-              document.getElementById('flagToggle').checked = true;
-              updateFlag();
-            }
-            if (airshipData.followEnabled) {
-              document.getElementById('followToggle').checked = true;
-            }
-            if (airshipData.hasTarget) {
-              setTarget(airshipData.targetLat, airshipData.targetLng);
-            }
-            if (airshipData.offlineStartTime) {
-              document.getElementById('offlineBtn').textContent = 'Совершить оффлайн-полёт';
-            }
-            focusOnAirship(12);
-            startAutoSave();
-          };
-          return;
-        }
-      } catch (e) {
-        console.warn('Failed to parse saved state');
-      }
-    }
-    btnContinue.disabled = true;
-  }
-
-  const timeWarpSlider = document.getElementById('timeWarpSlider');
-  const timeWarpValue = document.getElementById('timeWarpValue');
-  timeWarpSlider.addEventListener('input', () => {
-    const index = parseInt(timeWarpSlider.value);
-    timeWarpFactor = timeSteps[index];
-    updateDisplays();
-  });
-
-  document.getElementById('pauseBtn').addEventListener('click', () => {
-    isPaused = !isPaused;
-    updateDisplays();
-  });
-
-  const rudderSlider = document.getElementById('rudderSlider');
-  const throttleSlider = document.getElementById('throttleSlider');
-  const rudderValue = document.getElementById('rudderValue');
-  const throttleValue = document.getElementById('throttleValue');
-
-  rudderSlider.addEventListener('input', () => {
-    airshipData.autopilotEnabled = false;
-    document.getElementById('autopilotToggle').checked = false;
-    const sliderVal = parseInt(rudderSlider.value);
-    airshipData.rudder = sliderVal * 0.1;
-    rudderValue.textContent = airshipData.rudder.toFixed(1) + '°';
-  });
-
-  throttleSlider.addEventListener('input', () => {
-    airshipData.autopilotEnabled = false;
-    document.getElementById('autopilotToggle').checked = false;
-    airshipData.throttle = parseInt(throttleSlider.value);
-    throttleValue.textContent = throttleLabels[airshipData.throttle] || 'STOP';
-  });
-
-  document.getElementById('fastBrakeToggle').addEventListener('change', function() {
-    airshipData.fastBrakeEnabled = this.checked;
-    if (airshipData.fastBrakeEnabled && airshipData.speed <= 5) {
-      this.checked = false;
-      airshipData.fastBrakeEnabled = false;
-    }
-  });
-
-  document.getElementById('flagToggle').addEventListener('change', function() {
-    airshipData.flagEnabled = this.checked;
-    updateFlag();
-  });
-
-  document.getElementById('followToggle').addEventListener('change', function() {
-    airshipData.followEnabled = this.checked;
-  });
-
-  document.getElementById('autopilotToggle').addEventListener('change', function() {
-    airshipData.autopilotEnabled = this.checked;
-    if (airshipData.autopilotEnabled && !airshipData.hasTarget) {
-      this.checked = false;
-      airshipData.autopilotEnabled = false;
-      alert('Сначала установите цель!');
-    }
-  });
-
-  document.getElementById('focusBtn').addEventListener('click', () => {
-    focusOnAirship(12);
-  });
-
-  document.getElementById('targetBtn').addEventListener('click', () => {
-    if (airshipData.hasTarget) {
-      removeTarget();
-    } else {
-      awaitingTarget = true;
-      alert('Кликните по карте, чтобы установить точку назначения.');
-    }
-  });
-
-  document.getElementById('skipBtn').addEventListener('click', () => {
-    const daysInput = parseFloat(document.getElementById('skipDaysInput').value);
-    if (!isNaN(daysInput) && daysInput > 0) {
-      skipDays(daysInput);
-    }
-  });
-
-  document.getElementById('offlineBtn').addEventListener('click', performOfflineFlight);
-  document.getElementById('coalBtn').addEventListener('click', loadCoal);
-
-  document.getElementById('toggleControlsBtn').addEventListener('click', () => {
-    const controls = document.getElementById('controls');
-    const btn = document.getElementById('toggleControlsBtn');
-    if (controls.style.display === 'none') {
-      controls.style.display = 'flex';
-      btn.textContent = '^';
-    } else {
-      controls.style.display = 'none';
-      btn.textContent = '⌄';
-    }
-  });
-
-  function simulateStep() {
-    if (!airshipMarker || isPaused) return;
-
-    const now = Date.now();
-    const dtReal = (now - airshipData.lastUpdate) / 1000;
-    const dtSimulated = dtReal * timeWarpFactor;
-    airshipData.virtualElapsedSeconds += dtSimulated;
-    airshipData.lastUpdate = now;
-
-    // --- БЫСТРОЕ ТОРМОЖЕНИЕ ---
-    if (airshipData.fastBrakeEnabled && airshipData.speed > 5) {
-      airshipData.throttle = -5;
-    } else if (airshipData.speed <= 5 && airshipData.fastBrakeEnabled) {
-      airshipData.fastBrakeEnabled = false;
-      document.getElementById('fastBrakeToggle').checked = false;
-      airshipData.throttle = 0;
-    }
-
-    // --- АВТОПИЛОТ ---
-    if (airshipData.autopilotEnabled) {
-      runAutopilot();
-    }
-
-    const currentSign = Math.sign(airshipData.enginePower);
-    const targetSign = Math.sign(airshipData.throttle);
-
-    if (currentSign !== targetSign && airshipData.enginePower !== 0) {
-      if (airshipData.enginePower > 0) {
-        airshipData.enginePower = Math.max(0, airshipData.enginePower - ENGINE_POWER_RATE * dtSimulated);
-      } else {
-        airshipData.enginePower = Math.min(0, airshipData.enginePower + ENGINE_POWER_RATE * dtSimulated);
-      }
-      if (Math.abs(airshipData.enginePower) <= 0.1) {
-        airshipData.enginePower = 0;
-      }
-    } else {
-      const targetEnginePower = airshipData.throttle * 20;
-      if (airshipData.enginePower < targetEnginePower) {
-        airshipData.enginePower = Math.min(targetEnginePower, airshipData.enginePower + ENGINE_POWER_RATE * dtSimulated);
-      } else if (airshipData.enginePower > targetEnginePower) {
-        airshipData.enginePower = Math.max(targetEnginePower, airshipData.enginePower - ENGINE_POWER_RATE * dtSimulated);
-      }
-    }
-
-    let coalUsed = 0;
-    if (airshipData.throttle !== 0 && airshipData.enginePower !== 0 && airshipData.coalReserve > 0) {
-      const coalRateKgPerMin = Math.abs(airshipData.enginePower) / 20;
-      const coalRateKgPerSec = coalRateKgPerMin / 60;
-      coalUsed = coalRateKgPerSec * dtSimulated;
-      if (airshipData.coalReserve >= coalUsed) {
-        airshipData.coalReserve -= coalUsed;
-        airshipData.totalCoalBurned += coalUsed;
-      } else {
-        airshipData.coalReserve = 0;
-        airshipData.throttle = 0;
-        airshipData.enginePower = 0;
-      }
-    }
-
-    const rpm = calculatePropellerRPM();
-    if (rpm !== 0) {
-      const rotationPerSecond = Math.abs(rpm) * 360 / 60;
-      airshipData.propRotationAngle += rotationPerSecond * dtSimulated * Math.sign(rpm);
-      airshipData.propRotationAngle %= 360;
-    }
-
-    const currentThrust = airshipData.enginePower / 100;
-    let targetSpeed = currentThrust * MAX_SPEED;
-
-    if (Math.abs(airshipData.speed - targetSpeed) > 0.01) {
-      let acceleration = ACCELERATION_FORWARD;
-      if (Math.abs(airshipData.enginePower) < 0.1) {
-        acceleration = DECELERATION_COAST;
-      } else if (
-        (airshipData.enginePower < 0 && airshipData.speed > 0) ||
-        (airshipData.enginePower > 0 && airshipData.speed < 0)
-      ) {
-        acceleration = ACCELERATION_REVERSE;
-      }
-
-      if (airshipData.speed < targetSpeed) {
-        airshipData.speed = Math.min(targetSpeed, airshipData.speed + acceleration * dtSimulated);
-      } else {
-        airshipData.speed = Math.max(targetSpeed, airshipData.speed - acceleration * dtSimulated);
-      }
-    } else {
-      airshipData.speed = targetSpeed;
-    }
-
-    if (Math.abs(airshipData.enginePower) < 0.1 && Math.abs(airshipData.speed) > 0.1) {
-      const drag = DECELERATION_COAST * dtSimulated;
-      if (airshipData.speed > 0) {
-        airshipData.speed = Math.max(0, airshipData.speed - drag);
-      } else {
-        airshipData.speed = Math.min(0, airshipData.speed + drag);
-      }
-    }
-
-    if (Math.abs(airshipData.speed) > 0.1) {
-      const turnRate = MIN_TURN_RATE + (Math.abs(airshipData.speed) / MAX_SPEED) * (MAX_TURN_RATE - MIN_TURN_RATE);
-      const targetAngularVelocity = airshipData.rudder * turnRate;
-      const angularAccel = 0.5;
-      if (airshipData.angularVelocity < targetAngularVelocity) {
-        airshipData.angularVelocity = Math.min(targetAngularVelocity, airshipData.angularVelocity + angularAccel * dtSimulated);
-      } else if (airshipData.angularVelocity > targetAngularVelocity) {
-        airshipData.angularVelocity = Math.max(targetAngularVelocity, airshipData.angularVelocity - angularAccel * dtSimulated);
-      }
-      airshipData.heading += airshipData.angularVelocity * dtSimulated;
-      airshipData.heading = ((airshipData.heading % 360) + 360) % 360;
-    } else {
-      airshipData.angularVelocity *= 0.95;
-      if (Math.abs(airshipData.angularVelocity) < 0.01) airshipData.angularVelocity = 0;
-    }
-
-    if (Math.abs(airshipData.speed) > 0.1) {
-      const distanceKm = (Math.abs(airshipData.speed) * dtSimulated) / 3600;
-      const distanceMeters = distanceKm * 1000;
-      airshipData.totalDistanceMeters += distanceMeters;
-
-      const headingRad = (airshipData.heading * Math.PI) / 180;
-      const dx = distanceMeters * Math.sin(headingRad) * Math.sign(airshipData.speed);
-      const dy = distanceMeters * Math.cos(headingRad) * Math.sign(airshipData.speed);
-      const earthRadius = 6378137;
-      const newLat = airshipData.lat + (dy / earthRadius) * (180 / Math.PI);
-      const newLng = airshipData.lng + (dx / earthRadius) * (180 / Math.PI) / Math.cos(airshipData.lat * Math.PI / 180);
-      airshipData.lat = newLat;
-      airshipData.lng = newLng;
-      airshipMarker.setLatLng([newLat, newLng]);
-      if (flagMarker) flagMarker.setLatLng([newLat, newLng]);
-
-      if (airshipData.followEnabled) {
-        map.panTo([newLat, newLng], { animate: false });
-      }
-
-      if (airshipData.hasTarget) {
+      function setTarget(lat, lng) {
+        airshipData.hasTarget = true;
+        airshipData.targetLat = lat;
+        airshipData.targetLng = lng;
+        if (targetMarker) map.removeLayer(targetMarker);
+        targetMarker = L.marker([lat, lng], { icon: targetIcon }).addTo(map);
+        document.getElementById("targetBtn").textContent = "Удалить маркер";
+        document.getElementById("autopilotToggle").disabled = false;
         updateDirectionArrow();
       }
-    }
 
-    updateDisplays();
-    updateAirshipIcon();
-    updateStats();
-  }
+      function removeTarget() {
+        airshipData.hasTarget = false;
+        airshipData.targetLat = null;
+        airshipData.targetLng = null;
+        if (targetMarker) {
+          map.removeLayer(targetMarker);
+          targetMarker = null;
+        }
+        if (directionArrow) {
+          map.removeLayer(directionArrow);
+          directionArrow = null;
+        }
+        document.getElementById("targetBtn").textContent = "Добавить маркер";
+        document.getElementById("autopilotToggle").checked = false;
+        document.getElementById("autopilotToggle").disabled = true;
+        airshipData.autopilotEnabled = false;
+      }
 
-  map.on('click', (e) => {
-    if (awaitingSpawn) {
-      spawnAirship(e.latlng.lat, e.latlng.lng);
-    } else if (awaitingTarget) {
-      awaitingTarget = false;
-      setTarget(e.latlng.lat, e.latlng.lng);
-    }
-  });
+      function updateDirectionArrow() {
+        if (!airshipData.hasTarget || !airshipMarker) return;
+        if (directionArrow) map.removeLayer(directionArrow);
 
-  map.on('zoomend', () => {
-    if (airshipMarker) updateAirshipIcon();
-  });
+        const R = 6378137;
+        const lat1 = (airshipData.lat * Math.PI) / 180;
+        const lon1 = (airshipData.lng * Math.PI) / 180;
+        const lat2 = (airshipData.targetLat * Math.PI) / 180;
+        const lon2 = (airshipData.targetLng * Math.PI) / 180;
 
-  document.getElementById('btn-new').onclick = () => {
-    document.getElementById('start-menu').style.display = 'none';
-    awaitingSpawn = true;
-  };
+        const dLon = lon2 - lon1;
+        const y = Math.sin(dLon) * Math.cos(lat2);
+        const x =
+          Math.cos(lat1) * Math.sin(lat2) -
+          Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+        const bearing = ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 
-  loadSavedState();
-  setInterval(simulateStep, 50);
-</script>
+        const dx = R * Math.cos(lat1) * Math.sin(dLon);
+        const dy = R * (Math.sin(lat2) - Math.sin(lat1));
+        const distance = Math.sqrt(dx * dx + dy * dy); // метры
 
-</body>
+        // --- РАСЧЁТ ВРЕМЕНИ В ПУТИ ---
+        let timeToTargetText = "~ ∞";
+        if (Math.abs(airshipData.speed) > 5) {
+          // только если движется
+          const speedMs = Math.abs(airshipData.speed) / 3.6; // км/ч → м/с
+          const seconds = distance / speedMs;
+          const hours = Math.floor(seconds / 3600);
+          const minutes = Math.floor((seconds % 3600) / 60);
+          if (hours > 0) {
+            timeToTargetText = `~ ${hours} ч. ${minutes} мин.`;
+          } else {
+            timeToTargetText = `~ ${minutes} мин.`;
+          }
+        }
+
+        const arrowLength = 60;
+        const arrowRad = ((bearing - 90) * Math.PI) / 180;
+        const arrowEndX = arrowLength * Math.cos(arrowRad);
+        const arrowEndY = arrowLength * Math.sin(arrowRad);
+
+        const kmInt = Math.floor(distance / 1000);
+        const kmText = kmInt.toString().padStart(4, "0") + " км";
+
+        const size = 200;
+        const centerX = size / 2;
+        const centerY = size / 2;
+
+        const arrowSvg = `
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="overflow:visible;">
+      <line x1="${centerX}" y1="${centerY}" 
+            x2="${centerX + arrowEndX}" y2="${centerY + arrowEndY}" 
+            stroke="#000" stroke-width="3" marker-end="url(#arrowhead)"/>
+      <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#000"/>
+        </marker>
+      </defs>
+      <rect x="${centerX + arrowEndX + 5}" y="${centerY + arrowEndY - 36}" 
+            width="80" height="36" rx="5" ry="5" fill="#000" />
+      <text x="${centerX + arrowEndX + 45}" y="${centerY + arrowEndY - 20}" 
+            fill="#fff" font-size="12" text-anchor="middle" font-family="Arial">
+        ${kmText}
+      </text>
+      <text x="${centerX + arrowEndX + 45}" y="${centerY + arrowEndY - 5}" 
+            fill="#fff" font-size="11" text-anchor="middle" font-family="Arial">
+        ${timeToTargetText}
+      </text>
+    </svg>`;
+
+        const arrowIcon = L.divIcon({
+          className: "",
+          html: arrowSvg,
+          iconSize: [size, size],
+          iconAnchor: [centerX, centerY],
+        });
+
+        directionArrow = L.marker([airshipData.lat, airshipData.lng], {
+          icon: arrowIcon,
+        }).addTo(map);
+      }
+
+      function focusOnAirship(optimalZoom = 12) {
+        if (airshipMarker) {
+          map.setView([airshipData.lat, airshipData.lng], optimalZoom);
+        }
+      }
+
+      function formatDistance(meters) {
+        const km = Math.floor(meters / 1000);
+        const m = Math.floor(meters % 1000);
+        return `${km} км ${m} м`;
+      }
+
+      function formatCoal(kg) {
+        return kg.toFixed(3);
+      }
+
+      function formatTime(totalSeconds) {
+        const totalSec = Math.floor(totalSeconds);
+        const days = Math.floor(totalSec / 86400);
+        const hours = Math.floor((totalSec % 86400) / 3600);
+        const minutes = Math.floor((totalSec % 3600) / 60);
+        const seconds = totalSec % 60;
+
+        if (days > 0) {
+          return `${days} дн. ${hours} ч. ${minutes} мин.`;
+        } else {
+          return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+        }
+      }
+
+      function updateStats() {
+        document.getElementById("stats").innerHTML =
+          `Пройдено: ${formatDistance(airshipData.totalDistanceMeters)}<br>` +
+          `Уголь: ${formatCoal(airshipData.totalCoalBurned)} / ${formatCoal(airshipData.coalReserve)} кг<br>` +
+          `Время в пути: ${formatTime(airshipData.virtualElapsedSeconds)}`;
+      }
+
+      function updateDisplays() {
+        rudderSlider.value = Math.round(airshipData.rudder * 10);
+        throttleSlider.value = airshipData.throttle;
+        rudderValue.textContent = airshipData.rudder.toFixed(1) + "°";
+        throttleValue.textContent =
+          throttleLabels[airshipData.throttle] || "STOP";
+        document.getElementById("speedometer").textContent =
+          airshipData.speed.toFixed(1) + " км/ч";
+        const sign = airshipData.enginePower >= 0 ? "" : "-";
+        document.getElementById("enginePowerDisplay").textContent =
+          sign + Math.abs(Math.round(airshipData.enginePower)) + "%";
+
+        let courseDeviation = 0;
+        if (airshipData.hasTarget) {
+          const R = 6378137;
+          const lat1 = (airshipData.lat * Math.PI) / 180;
+          const lon1 = (airshipData.lng * Math.PI) / 180;
+          const lat2 = (airshipData.targetLat * Math.PI) / 180;
+          const lon2 = (airshipData.targetLng * Math.PI) / 180;
+          const dLon = lon2 - lon1;
+          const y = Math.sin(dLon) * Math.cos(lat2);
+          const x =
+            Math.cos(lat1) * Math.sin(lat2) -
+            Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+          const bearingToTarget =
+            ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+          courseDeviation = bearingToTarget - airshipData.heading;
+          if (courseDeviation > 180) courseDeviation -= 360;
+          if (courseDeviation < -180) courseDeviation += 360;
+        }
+        document.getElementById("compass").textContent =
+          `${Math.round(airshipData.heading)}° (${Math.abs(Math.round(courseDeviation))}°)`;
+
+        document.getElementById("timeWarpValue").textContent =
+          timeWarpFactor + "x";
+        document.getElementById("pauseBtn").textContent = isPaused
+          ? "▶️"
+          : "⏸️";
+        document.getElementById("autopilotToggle").checked =
+          airshipData.autopilotEnabled;
+        document.getElementById("fastBrakeToggle").checked =
+          airshipData.fastBrakeEnabled;
+      }
+
+      function runAutopilot() {
+        if (
+          !airshipData.hasTarget ||
+          !airshipData.autopilotEnabled ||
+          airshipData.coalReserve <= 0
+        )
+          return;
+
+        const R = 6378137;
+        const lat1 = (airshipData.lat * Math.PI) / 180;
+        const lon1 = (airshipData.lng * Math.PI) / 180;
+        const lat2 = (airshipData.targetLat * Math.PI) / 180;
+        const lon2 = (airshipData.targetLng * Math.PI) / 180;
+
+        const dLon = lon2 - lon1;
+        const y = Math.sin(dLon) * Math.cos(lat2);
+        const x =
+          Math.cos(lat1) * Math.sin(lat2) -
+          Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+        const bearingToTarget =
+          ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+
+        const dx = R * Math.cos(lat1) * Math.sin(dLon);
+        const dy = R * (Math.sin(lat2) - Math.sin(lat1));
+        const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
+
+        let headingError = bearingToTarget - airshipData.heading;
+        if (headingError > 180) headingError -= 360;
+        if (headingError < -180) headingError += 360;
+
+        let rudderCommand = headingError * 0.01;
+        rudderCommand = Math.max(-0.5, Math.min(0.5, rudderCommand));
+        airshipData.rudder = rudderCommand;
+
+        const speedMs = airshipData.speed / 3.6;
+        const decel = ACCELERATION_REVERSE / 3.6;
+        const brakingDistance = (speedMs * speedMs) / (2 * decel);
+
+        let throttleCommand = 0;
+        if (distanceToTarget < 100) {
+          throttleCommand = 0;
+        } else if (distanceToTarget < brakingDistance + 500) {
+          throttleCommand = -5;
+        } else {
+          throttleCommand = 5;
+        }
+
+        airshipData.throttle = Math.round(throttleCommand);
+        document.getElementById("rudderSlider").value = Math.round(
+          rudderCommand * 10,
+        );
+        document.getElementById("throttleSlider").value = airshipData.throttle;
+      }
+
+      function skipSimulationTime(secondsToSkip) {
+        if (!airshipMarker || secondsToSkip <= 0) return;
+
+        const simulatedSeconds = secondsToSkip * timeWarpFactor;
+
+        let currentLat = airshipData.lat;
+        let currentLng = airshipData.lng;
+        let currentHeading = airshipData.heading;
+        let currentSpeed = airshipData.speed;
+        let currentAngularVel = airshipData.angularVelocity;
+        let currentPropAngle = airshipData.propRotationAngle;
+        let coalBurned = 0;
+        let currentEnginePower = airshipData.enginePower;
+        let currentCoalReserve = airshipData.coalReserve;
+        let currentThrottle = airshipData.throttle;
+
+        let remaining = simulatedSeconds;
+        const step = 1;
+        while (remaining > 0 && currentCoalReserve > 0) {
+          const dt = Math.min(step, remaining);
+          remaining -= dt;
+
+          if (airshipData.fastBrakeEnabled && currentSpeed > 5) {
+            currentThrottle = -5;
+          } else if (currentSpeed <= 5 && airshipData.fastBrakeEnabled) {
+            airshipData.fastBrakeEnabled = false;
+            currentThrottle = 0;
+          }
+
+          if (airshipData.autopilotEnabled && airshipData.hasTarget) {
+            const R = 6378137;
+            const lat1 = (currentLat * Math.PI) / 180;
+            const lon1 = (currentLng * Math.PI) / 180;
+            const lat2 = (airshipData.targetLat * Math.PI) / 180;
+            const lon2 = (airshipData.targetLng * Math.PI) / 180;
+            const dLon = lon2 - lon1;
+            const dx = R * Math.cos(lat1) * Math.sin(dLon);
+            const dy = R * (Math.sin(lat2) - Math.sin(lat1));
+            const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
+            const speedMs = Math.abs(currentSpeed) / 3.6;
+            const decel = ACCELERATION_REVERSE / 3.6;
+            const brakingDistance = (speedMs * speedMs) / (2 * decel);
+            if (distanceToTarget < 100) {
+              currentThrottle = 0;
+            } else if (distanceToTarget < brakingDistance + 500) {
+              currentThrottle = -5;
+            } else {
+              currentThrottle = 5;
+            }
+          }
+
+          const currentSign = Math.sign(currentEnginePower);
+          const targetSign = Math.sign(currentThrottle);
+
+          if (currentSign !== targetSign && currentEnginePower !== 0) {
+            if (currentEnginePower > 0) {
+              currentEnginePower = Math.max(
+                0,
+                currentEnginePower - ENGINE_POWER_RATE * dt,
+              );
+            } else {
+              currentEnginePower = Math.min(
+                0,
+                currentEnginePower + ENGINE_POWER_RATE * dt,
+              );
+            }
+            if (Math.abs(currentEnginePower) <= 0.1) {
+              currentEnginePower = 0;
+            }
+          } else {
+            const targetEnginePower = currentThrottle * 20;
+            if (currentEnginePower < targetEnginePower) {
+              currentEnginePower = Math.min(
+                targetEnginePower,
+                currentEnginePower + ENGINE_POWER_RATE * dt,
+              );
+            } else if (currentEnginePower > targetEnginePower) {
+              currentEnginePower = Math.max(
+                targetEnginePower,
+                currentEnginePower - ENGINE_POWER_RATE * dt,
+              );
+            }
+          }
+
+          if (currentThrottle !== 0 && currentEnginePower !== 0) {
+            const coalRateKgPerMin =
+              Math.abs(currentEnginePower) * COAL_CONSUMPTION_RATE;
+            const coalRateKgPerSec = coalRateKgPerMin / 60;
+            const coalUsed = coalRateKgPerSec * dt;
+            if (currentCoalReserve >= coalUsed) {
+              currentCoalReserve -= coalUsed;
+              coalBurned += coalUsed;
+            } else {
+              currentThrottle = 0;
+              currentEnginePower = 0;
+            }
+          }
+
+          const currentThrust = currentEnginePower / 100;
+          let targetSpeed = currentThrust * MAX_SPEED;
+
+          if (Math.abs(currentSpeed - targetSpeed) > 0.01) {
+            let acceleration = ACCELERATION_FORWARD;
+            if (Math.abs(currentEnginePower) < 0.1) {
+              acceleration = DECELERATION_COAST;
+            } else if (
+              (currentEnginePower < 0 && currentSpeed > 0) ||
+              (currentEnginePower > 0 && currentSpeed < 0)
+            ) {
+              acceleration = ACCELERATION_REVERSE;
+            }
+
+            if (currentSpeed < targetSpeed) {
+              currentSpeed = Math.min(
+                targetSpeed,
+                currentSpeed + acceleration * dt,
+              );
+            } else {
+              currentSpeed = Math.max(
+                targetSpeed,
+                currentSpeed - acceleration * dt,
+              );
+            }
+          } else {
+            currentSpeed = targetSpeed;
+          }
+
+          if (
+            Math.abs(currentEnginePower) < 0.1 &&
+            Math.abs(currentSpeed) > 0.1
+          ) {
+            const drag = DECELERATION_COAST * dt;
+            if (currentSpeed > 0) {
+              currentSpeed = Math.max(0, currentSpeed - drag);
+            } else {
+              currentSpeed = Math.min(0, currentSpeed + drag);
+            }
+          }
+
+          if (Math.abs(currentSpeed) > 0.1) {
+            const turnRate =
+              MIN_TURN_RATE +
+              (Math.abs(currentSpeed) / MAX_SPEED) *
+                (MAX_TURN_RATE - MIN_TURN_RATE);
+            const targetAngularVelocity = airshipData.rudder * turnRate;
+            const angularAccel = 0.5;
+            if (currentAngularVel < targetAngularVelocity) {
+              currentAngularVel = Math.min(
+                targetAngularVelocity,
+                currentAngularVel + angularAccel * dt,
+              );
+            } else if (currentAngularVel > targetAngularVelocity) {
+              currentAngularVel = Math.max(
+                targetAngularVelocity,
+                currentAngularVel - angularAccel * dt,
+              );
+            }
+            currentHeading += currentAngularVel * dt;
+            currentHeading = ((currentHeading % 360) + 360) % 360;
+          } else {
+            currentAngularVel *= 0.95;
+            if (Math.abs(currentAngularVel) < 0.01) currentAngularVel = 0;
+          }
+
+          if (Math.abs(currentSpeed) > 0.1) {
+            const distanceKm = (Math.abs(currentSpeed) * dt) / 3600;
+            const distanceMeters = distanceKm * 1000;
+            airshipData.totalDistanceMeters += distanceMeters;
+
+            const headingRad = (currentHeading * Math.PI) / 180;
+            const dx =
+              distanceMeters * Math.sin(headingRad) * Math.sign(currentSpeed);
+            const dy =
+              distanceMeters * Math.cos(headingRad) * Math.sign(currentSpeed);
+            const earthRadius = 6378137;
+            currentLat += (dy / earthRadius) * (180 / Math.PI);
+            currentLng +=
+              ((dx / earthRadius) * (180 / Math.PI)) /
+              Math.cos((currentLat * Math.PI) / 180);
+          }
+        }
+
+        airshipData.lat = currentLat;
+        airshipData.lng = currentLng;
+        airshipData.heading = currentHeading;
+        airshipData.speed = currentSpeed;
+        airshipData.angularVelocity = currentAngularVel;
+        airshipData.propRotationAngle = currentPropAngle;
+        airshipData.totalCoalBurned += coalBurned;
+        airshipData.coalReserve = currentCoalReserve;
+        airshipData.enginePower = currentEnginePower;
+        airshipData.virtualElapsedSeconds += secondsToSkip;
+        airshipData.lastUpdate = Date.now();
+
+        if (airshipData.coalReserve <= 0) {
+          airshipData.throttle = 0;
+          airshipData.enginePower = 0;
+        }
+      }
+
+      function skipDays(days) {
+        if (!airshipMarker || days <= 0) return;
+        const secondsToSkip = days * 24 * 3600;
+        skipSimulationTime(secondsToSkip);
+        airshipMarker.setLatLng([airshipData.lat, airshipData.lng]);
+        if (flagMarker)
+          flagMarker.setLatLng([airshipData.lat, airshipData.lng]);
+        updateAirshipIcon();
+        if (airshipData.hasTarget) updateDirectionArrow();
+        updateDisplays();
+        updateStats();
+      }
+
+      function performOfflineFlight() {
+        if (!airshipMarker) return;
+
+        const now = Date.now();
+        if (airshipData.offlineStartTime === null) {
+          airshipData.offlineStartTime = now;
+          document.getElementById("offlineBtn").textContent =
+            "Совершить оффлайн-полёт";
+          localStorage.setItem("airshipState", JSON.stringify(airshipData));
+          alert(
+            "Оффлайн-полёт начат. Вернитесь позже и нажмите эту кнопку снова.",
+          );
+        } else {
+          const elapsedRealMs = now - airshipData.offlineStartTime;
+          const elapsedRealSec = elapsedRealMs / 1000;
+          airshipData.offlineStartTime = null;
+          document.getElementById("offlineBtn").textContent =
+            "Начать оффлайн-полёт";
+
+          skipSimulationTime(elapsedRealSec);
+
+          airshipMarker.setLatLng([airshipData.lat, airshipData.lng]);
+          if (flagMarker)
+            flagMarker.setLatLng([airshipData.lat, airshipData.lng]);
+          updateAirshipIcon();
+          if (airshipData.hasTarget) updateDirectionArrow();
+          updateDisplays();
+          updateStats();
+          localStorage.setItem("airshipState", JSON.stringify(airshipData));
+          alert(
+            `Пропущено ${elapsedRealSec.toFixed(1)} секунд реального времени.`,
+          );
+        }
+      }
+
+      function loadCoal() {
+        const add = parseFloat(prompt("Сколько кг угля загрузить?", "100"));
+        if (!isNaN(add) && add > 0) {
+          airshipData.coalReserve += add;
+          updateStats();
+          localStorage.setItem("airshipState", JSON.stringify(airshipData));
+        }
+      }
+
+      let gameStarted = false;
+      let awaitingSpawn = false;
+      let awaitingTarget = false;
+
+      function spawnAirship(lat, lng) {
+        if (gameStarted || !lat || !lng) return;
+        gameStarted = true;
+        awaitingSpawn = false;
+
+        if (airshipMarker) map.removeLayer(airshipMarker);
+        airshipMarker = L.marker([lat, lng], {
+          icon: L.divIcon({ className: "" }),
+        }).addTo(map);
+        Object.assign(airshipData, {
+          lat,
+          lng,
+          heading: 0,
+          speed: 0,
+          throttle: 0,
+          rudder: 0,
+          angularVelocity: 0,
+          lastUpdate: Date.now(),
+          propRotationAngle: 0,
+          flagEnabled: false,
+          followEnabled: false,
+          autopilotEnabled: false,
+          fastBrakeEnabled: false,
+          startTime: Date.now(),
+          totalDistanceMeters: 0,
+          coalReserve: 5000,
+          totalCoalBurned: 0,
+          hasTarget: false,
+          targetLat: null,
+          targetLng: null,
+          virtualElapsedSeconds: 0,
+          offlineStartTime: null,
+          enginePower: 0,
+          engineReversing: false,
+        });
+
+        document.getElementById("controls").style.display = "flex";
+        document.getElementById("toggleControlsBtn").style.display = "block";
+        document.getElementById("stats").style.display = "block";
+        document.getElementById("offlineBtn").textContent =
+          "Начать оффлайн-полёт";
+        document.getElementById("autopilotToggle").disabled = true;
+
+        updateDisplays();
+        updateAirshipIcon();
+        updateFlag();
+        updateStats();
+        startAutoSave();
+      }
+
+      let autoSaveInterval = null;
+      function startAutoSave() {
+        if (autoSaveInterval) clearInterval(autoSaveInterval);
+        autoSaveInterval = setInterval(() => {
+          if (airshipMarker) {
+            localStorage.setItem("airshipState", JSON.stringify(airshipData));
+          }
+        }, 10000);
+      }
+
+      function loadSavedState() {
+        const saved = localStorage.getItem("airshipState");
+        const btnContinue = document.getElementById("btn-continue");
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (parsed.lat !== undefined && parsed.lng !== undefined) {
+              btnContinue.disabled = false;
+              btnContinue.onclick = () => {
+                document.getElementById("start-menu").style.display = "none";
+                spawnAirship(parsed.lat, parsed.lng);
+                Object.assign(airshipData, parsed);
+                gameStarted = true;
+                awaitingSpawn = false;
+                updateDisplays();
+                updateAirshipIcon();
+                if (airshipData.flagEnabled) {
+                  document.getElementById("flagToggle").checked = true;
+                  updateFlag();
+                }
+                if (airshipData.followEnabled) {
+                  document.getElementById("followToggle").checked = true;
+                }
+                if (airshipData.hasTarget) {
+                  setTarget(airshipData.targetLat, airshipData.targetLng);
+                }
+                if (airshipData.offlineStartTime) {
+                  document.getElementById("offlineBtn").textContent =
+                    "Совершить оффлайн-полёт";
+                }
+                focusOnAirship(12);
+                startAutoSave();
+              };
+              return;
+            }
+          } catch (e) {
+            console.warn("Failed to parse saved state");
+          }
+        }
+        btnContinue.disabled = true;
+      }
+
+      const timeWarpSlider = document.getElementById("timeWarpSlider");
+      const timeWarpValue = document.getElementById("timeWarpValue");
+      timeWarpSlider.addEventListener("input", () => {
+        const index = parseInt(timeWarpSlider.value);
+        timeWarpFactor = timeSteps[index];
+        updateDisplays();
+      });
+
+      document.getElementById("pauseBtn").addEventListener("click", () => {
+        isPaused = !isPaused;
+        updateDisplays();
+      });
+
+      const rudderSlider = document.getElementById("rudderSlider");
+      const throttleSlider = document.getElementById("throttleSlider");
+      const rudderValue = document.getElementById("rudderValue");
+      const throttleValue = document.getElementById("throttleValue");
+
+      rudderSlider.addEventListener("input", () => {
+        airshipData.autopilotEnabled = false;
+        document.getElementById("autopilotToggle").checked = false;
+        const sliderVal = parseInt(rudderSlider.value);
+        airshipData.rudder = sliderVal * 0.1;
+        rudderValue.textContent = airshipData.rudder.toFixed(1) + "°";
+      });
+
+      throttleSlider.addEventListener("input", () => {
+        airshipData.autopilotEnabled = false;
+        document.getElementById("autopilotToggle").checked = false;
+        airshipData.throttle = parseInt(throttleSlider.value);
+        throttleValue.textContent =
+          throttleLabels[airshipData.throttle] || "STOP";
+      });
+
+      document
+        .getElementById("fastBrakeToggle")
+        .addEventListener("change", function () {
+          airshipData.fastBrakeEnabled = this.checked;
+          if (airshipData.fastBrakeEnabled && airshipData.speed <= 5) {
+            this.checked = false;
+            airshipData.fastBrakeEnabled = false;
+          }
+        });
+
+      document
+        .getElementById("flagToggle")
+        .addEventListener("change", function () {
+          airshipData.flagEnabled = this.checked;
+          updateFlag();
+        });
+
+      document
+        .getElementById("followToggle")
+        .addEventListener("change", function () {
+          airshipData.followEnabled = this.checked;
+        });
+
+      document
+        .getElementById("autopilotToggle")
+        .addEventListener("change", function () {
+          airshipData.autopilotEnabled = this.checked;
+          if (airshipData.autopilotEnabled && !airshipData.hasTarget) {
+            this.checked = false;
+            airshipData.autopilotEnabled = false;
+            alert("Сначала установите цель!");
+          }
+        });
+
+      document.getElementById("focusBtn").addEventListener("click", () => {
+        focusOnAirship(12);
+      });
+
+      document.getElementById("targetBtn").addEventListener("click", () => {
+        if (airshipData.hasTarget) {
+          removeTarget();
+        } else {
+          awaitingTarget = true;
+          alert("Кликните по карте, чтобы установить точку назначения.");
+        }
+      });
+
+      document.getElementById("skipBtn").addEventListener("click", () => {
+        const daysInput = parseFloat(
+          document.getElementById("skipDaysInput").value,
+        );
+        if (!isNaN(daysInput) && daysInput > 0) {
+          skipDays(daysInput);
+        }
+      });
+
+      document
+        .getElementById("offlineBtn")
+        .addEventListener("click", performOfflineFlight);
+      document.getElementById("coalBtn").addEventListener("click", loadCoal);
+
+      document
+        .getElementById("toggleControlsBtn")
+        .addEventListener("click", () => {
+          const controls = document.getElementById("controls");
+          const btn = document.getElementById("toggleControlsBtn");
+          if (controls.style.display === "none") {
+            controls.style.display = "flex";
+            btn.textContent = "^";
+          } else {
+            controls.style.display = "none";
+            btn.textContent = "⌄";
+          }
+        });
+
+      function simulateStep() {
+        if (!airshipMarker || isPaused) return;
+
+        const now = Date.now();
+        const dtReal = (now - airshipData.lastUpdate) / 1000;
+        const dtSimulated = dtReal * timeWarpFactor;
+        airshipData.virtualElapsedSeconds += dtSimulated;
+        airshipData.lastUpdate = now;
+
+        if (airshipData.fastBrakeEnabled && airshipData.speed > 5) {
+          airshipData.throttle = -5;
+        } else if (airshipData.speed <= 5 && airshipData.fastBrakeEnabled) {
+          airshipData.fastBrakeEnabled = false;
+          document.getElementById("fastBrakeToggle").checked = false;
+          airshipData.throttle = 0;
+        }
+
+        if (airshipData.autopilotEnabled) {
+          runAutopilot();
+        }
+
+        const currentSign = Math.sign(airshipData.enginePower);
+        const targetSign = Math.sign(airshipData.throttle);
+
+        if (currentSign !== targetSign && airshipData.enginePower !== 0) {
+          if (airshipData.enginePower > 0) {
+            airshipData.enginePower = Math.max(
+              0,
+              airshipData.enginePower - ENGINE_POWER_RATE * dtSimulated,
+            );
+          } else {
+            airshipData.enginePower = Math.min(
+              0,
+              airshipData.enginePower + ENGINE_POWER_RATE * dtSimulated,
+            );
+          }
+          if (Math.abs(airshipData.enginePower) <= 0.1) {
+            airshipData.enginePower = 0;
+          }
+        } else {
+          const targetEnginePower = airshipData.throttle * 20;
+          if (airshipData.enginePower < targetEnginePower) {
+            airshipData.enginePower = Math.min(
+              targetEnginePower,
+              airshipData.enginePower + ENGINE_POWER_RATE * dtSimulated,
+            );
+          } else if (airshipData.enginePower > targetEnginePower) {
+            airshipData.enginePower = Math.max(
+              targetEnginePower,
+              airshipData.enginePower - ENGINE_POWER_RATE * dtSimulated,
+            );
+          }
+        }
+
+        let coalUsed = 0;
+        if (
+          airshipData.throttle !== 0 &&
+          airshipData.enginePower !== 0 &&
+          airshipData.coalReserve > 0
+        ) {
+          const coalRateKgPerMin =
+            Math.abs(airshipData.enginePower) * COAL_CONSUMPTION_RATE;
+          const coalRateKgPerSec = coalRateKgPerMin / 60;
+          coalUsed = coalRateKgPerSec * dtSimulated;
+          if (airshipData.coalReserve >= coalUsed) {
+            airshipData.coalReserve -= coalUsed;
+            airshipData.totalCoalBurned += coalUsed;
+          } else {
+            airshipData.coalReserve = 0;
+            airshipData.throttle = 0;
+            airshipData.enginePower = 0;
+          }
+        }
+
+        const rpm = calculatePropellerRPM();
+        if (rpm !== 0) {
+          const rotationPerSecond = (Math.abs(rpm) * 360) / 60;
+          airshipData.propRotationAngle +=
+            rotationPerSecond * dtSimulated * Math.sign(rpm);
+          airshipData.propRotationAngle %= 360;
+        }
+
+        const currentThrust = airshipData.enginePower / 100;
+        let targetSpeed = currentThrust * MAX_SPEED;
+
+        if (Math.abs(airshipData.speed - targetSpeed) > 0.01) {
+          let acceleration = ACCELERATION_FORWARD;
+          if (Math.abs(airshipData.enginePower) < 0.1) {
+            acceleration = DECELERATION_COAST;
+          } else if (
+            (airshipData.enginePower < 0 && airshipData.speed > 0) ||
+            (airshipData.enginePower > 0 && airshipData.speed < 0)
+          ) {
+            acceleration = ACCELERATION_REVERSE;
+          }
+
+          if (airshipData.speed < targetSpeed) {
+            airshipData.speed = Math.min(
+              targetSpeed,
+              airshipData.speed + acceleration * dtSimulated,
+            );
+          } else {
+            airshipData.speed = Math.max(
+              targetSpeed,
+              airshipData.speed - acceleration * dtSimulated,
+            );
+          }
+        } else {
+          airshipData.speed = targetSpeed;
+        }
+
+        if (
+          Math.abs(airshipData.enginePower) < 0.1 &&
+          Math.abs(airshipData.speed) > 0.1
+        ) {
+          const drag = DECELERATION_COAST * dtSimulated;
+          if (airshipData.speed > 0) {
+            airshipData.speed = Math.max(0, airshipData.speed - drag);
+          } else {
+            airshipData.speed = Math.min(0, airshipData.speed + drag);
+          }
+        }
+
+        if (Math.abs(airshipData.speed) > 0.1) {
+          const turnRate =
+            MIN_TURN_RATE +
+            (Math.abs(airshipData.speed) / MAX_SPEED) *
+              (MAX_TURN_RATE - MIN_TURN_RATE);
+          const targetAngularVelocity = airshipData.rudder * turnRate;
+          const angularAccel = 0.5;
+          if (airshipData.angularVelocity < targetAngularVelocity) {
+            airshipData.angularVelocity = Math.min(
+              targetAngularVelocity,
+              airshipData.angularVelocity + angularAccel * dtSimulated,
+            );
+          } else if (airshipData.angularVelocity > targetAngularVelocity) {
+            airshipData.angularVelocity = Math.max(
+              targetAngularVelocity,
+              airshipData.angularVelocity - angularAccel * dtSimulated,
+            );
+          }
+          airshipData.heading += airshipData.angularVelocity * dtSimulated;
+          airshipData.heading = ((airshipData.heading % 360) + 360) % 360;
+        } else {
+          airshipData.angularVelocity *= 0.95;
+          if (Math.abs(airshipData.angularVelocity) < 0.01)
+            airshipData.angularVelocity = 0;
+        }
+
+        if (Math.abs(airshipData.speed) > 0.1) {
+          const distanceKm = (Math.abs(airshipData.speed) * dtSimulated) / 3600;
+          const distanceMeters = distanceKm * 1000;
+          airshipData.totalDistanceMeters += distanceMeters;
+
+          const headingRad = (airshipData.heading * Math.PI) / 180;
+          const dx =
+            distanceMeters *
+            Math.sin(headingRad) *
+            Math.sign(airshipData.speed);
+          const dy =
+            distanceMeters *
+            Math.cos(headingRad) *
+            Math.sign(airshipData.speed);
+          const earthRadius = 6378137;
+          const newLat = airshipData.lat + (dy / earthRadius) * (180 / Math.PI);
+          const newLng =
+            airshipData.lng +
+            ((dx / earthRadius) * (180 / Math.PI)) /
+              Math.cos((airshipData.lat * Math.PI) / 180);
+          airshipData.lat = newLat;
+          airshipData.lng = newLng;
+          airshipMarker.setLatLng([newLat, newLng]);
+          if (flagMarker) flagMarker.setLatLng([newLat, newLng]);
+
+          if (airshipData.followEnabled) {
+            map.panTo([newLat, newLng], { animate: false });
+          }
+
+          if (airshipData.hasTarget) {
+            updateDirectionArrow();
+          }
+        }
+
+        updateDisplays();
+        updateAirshipIcon();
+        updateStats();
+      }
+
+      map.on("click", (e) => {
+        if (awaitingSpawn) {
+          spawnAirship(e.latlng.lat, e.latlng.lng);
+        } else if (awaitingTarget) {
+          awaitingTarget = false;
+          setTarget(e.latlng.lat, e.latlng.lng);
+        }
+      });
+
+      map.on("zoomend", () => {
+        if (airshipMarker) updateAirshipIcon();
+      });
+
+      document.getElementById("btn-new").onclick = () => {
+        document.getElementById("start-menu").style.display = "none";
+        awaitingSpawn = true;
+      };
+
+      loadSavedState();
+      setInterval(simulateStep, 50);
+    </script>
+  </body>
 </html>
