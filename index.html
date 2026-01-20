@@ -338,7 +338,7 @@
 
       // 🔥 НОВЫЕ КОНСТАНТЫ УГЛЯ
       const MAX_COAL_RESERVE = 900000; // кг
-      const COAL_CONSUMPTION_RATE = 0.001; // 1 кг/мин на 1% мощности
+      const COAL_CONSUMPTION_RATE = 0.01; // 1 кг/мин на 1% мощности
 
       const ENGINE_POWER_RATE = 1.0;
       const MAX_SPEED = 135;
@@ -1016,7 +1016,7 @@
           fastBrakeEnabled: false,
           startTime: Date.now(),
           totalDistanceMeters: 0,
-          coalReserve: 5000,
+          coalReserve: 0,
           totalCoalBurned: 0,
           hasTarget: false,
           targetLat: null,
