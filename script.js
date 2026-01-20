@@ -70,6 +70,8 @@ let airshipData = {
   enginePower: 0,
   groundSpeed: 0,
   windLastVirtualUpdate: 0,
+  virtualElapsedSeconds: 0,
+  anchorEnabled: true,
 };
 
 // === ИКОНКИ ===
@@ -439,7 +441,7 @@ function updateWindCompass() {
 
   const windSpeedKmh = beaufortToMps(windSpeedBf) * 3.6;
   const windSpeedText =
-    windSpeedKmh > 0 ? `(${windSpeedKmh.toFixed(0)} км/ч)` : "Штиль";
+    windSpeedKmh > 0 ? `(${windSpeedKmh.toFixed(0)} км/ч)` : "(0 км/ч)";
 
   const compassSvg = `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
@@ -463,6 +465,12 @@ function updateWindCompass() {
 // === ФИЗИКА И ВЕТЕР ===
 
 function applyWindEffect(dt) {
+  // Если на якоре — ветер не действует
+  if (airshipData.anchorEnabled) {
+    airshipData.groundSpeed = airshipData.speed; // просто копируем внутреннюю скорость
+    return;
+  }
+
   const windSpeedMs = beaufortToMps(windSpeedBf);
   const windAngleRad = (windDirection * Math.PI) / 180;
 
@@ -561,6 +569,7 @@ function simulateStep() {
   if (windMode === "auto") {
     const virtualTime = airshipData.virtualElapsedSeconds;
     if (virtualTime - (airshipData.windLastVirtualUpdate || 0) >= 60) {
+      console.log("!!!");
       // каждые 60 сек
       let changed = false;
 
@@ -1174,6 +1183,10 @@ document.getElementById("toggleControlsBtn").addEventListener("click", () => {
     controls.style.display = "none";
     btn.textContent = "⌄";
   }
+});
+
+document.getElementById("anchorToggle").addEventListener("change", function () {
+  airshipData.anchorEnabled = this.checked;
 });
 
 map.on("click", (e) => {
