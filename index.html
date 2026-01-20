@@ -262,7 +262,22 @@
           value="1"
         />
         <div class="value-display" id="timeWarpValue">1x</div>
-        <div class="label">Ускорение времени</div>
+        <div class="label">Ускорение</div>
+      </div>
+
+      <!-- 🔥 НОВАЯ ШКАЛА МАСШТАБА -->
+      <div class="control-group">
+        <input
+          type="range"
+          id="zoomScaleSlider"
+          class="slider"
+          min="0"
+          max="7"
+          step="1"
+          value="0"
+        />
+        <div class="value-display" id="zoomScaleValue">1x</div>
+        <div class="label">Масштаб</div>
       </div>
 
       <div class="control-group">
@@ -270,17 +285,9 @@
         <div class="label">Пауза</div>
       </div>
 
-      <div class="skip-control">
-        <input
-          type="number"
-          id="skipDaysInput"
-          class="skip-input"
-          value="1"
-          min="0.1"
-          step="0.1"
-        />
-        <button id="skipBtn" class="skip-btn">Пропустить</button>
-        <div class="label">Дней</div>
+      <!-- 🔥 ЗАМЕНА: галочка вместо кнопки пропуска -->
+      <div class="control-group">
+        <label><input type="checkbox" id="autoSkipToggle" /> Автопропуск</label>
       </div>
 
       <div class="control-group flag-control">
@@ -289,9 +296,11 @@
         <label><input type="checkbox" id="autopilotToggle" /> Автопилот</label>
         <button id="focusBtn">К дирижаблю</button>
         <button id="targetBtn">Добавить маркер</button>
-        <button id="offlineBtn" class="offline-btn">
-          Начать оффлайн-полёт
-        </button>
+        <!-- 🔥 УДАЛЕНО: offlineBtn -->
+        <!-- 🔥 ДОБАВЛЕНО: кнопки позиции и синхронизации -->
+        <button id="savePosBtn">💾</button>
+        <button id="loadPosBtn">📂</button>
+        <button id="syncTimeBtn">⏱️ Синхр.</button>
         <button id="coalBtn" class="coal-btn">Загрузить уголь</button>
       </div>
     </div>
@@ -336,9 +345,10 @@
       let timeWarpFactor = 1;
       let isPaused = false;
 
-      // 🔥 НОВЫЕ КОНСТАНТЫ УГЛЯ
-      const MAX_COAL_RESERVE = 900000; // кг
-      const COAL_CONSUMPTION_RATE = 0.01; // 1 кг/мин на 1% мощности
+      const MAX_COAL_RESERVE = 900000;
+      const COAL_CONSUMPTION_RATE = 0.001;
+      const ZOOM_SCALE_LEVELS = [12, 11, 10, 9, 8, 6, 4, 2];
+      let currentZoomScaleIndex = 0;
 
       const ENGINE_POWER_RATE = 1.0;
       const MAX_SPEED = 135;
@@ -363,6 +373,8 @@
         followEnabled: false,
         autopilotEnabled: false,
         fastBrakeEnabled: false,
+        autoSkipEnabled: false,
+        autoSkipTargetSeconds: 86400,
         startTime: null,
         totalDistanceMeters: 0,
         coalReserve: 0,
@@ -371,7 +383,7 @@
         targetLat: null,
         targetLng: null,
         virtualElapsedSeconds: 0,
-        offlineStartTime: null,
+        virtualStartTime: null,
         enginePower: 0,
         engineReversing: false,
       };
@@ -532,13 +544,11 @@
 
         const dx = R * Math.cos(lat1) * Math.sin(dLon);
         const dy = R * (Math.sin(lat2) - Math.sin(lat1));
-        const distance = Math.sqrt(dx * dx + dy * dy); // метры
+        const distance = Math.sqrt(dx * dx + dy * dy);
 
-        // --- РАСЧЁТ ВРЕМЕНИ В ПУТИ ---
         let timeToTargetText = "~ ∞";
         if (Math.abs(airshipData.speed) > 5) {
-          // только если движется
-          const speedMs = Math.abs(airshipData.speed) / 3.6; // км/ч → м/с
+          const speedMs = Math.abs(airshipData.speed) / 3.6;
           const seconds = distance / speedMs;
           const hours = Math.floor(seconds / 3600);
           const minutes = Math.floor((seconds % 3600) / 60);
@@ -562,26 +572,26 @@
         const centerY = size / 2;
 
         const arrowSvg = `
-    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="overflow:visible;">
-      <line x1="${centerX}" y1="${centerY}" 
-            x2="${centerX + arrowEndX}" y2="${centerY + arrowEndY}" 
-            stroke="#000" stroke-width="3" marker-end="url(#arrowhead)"/>
-      <defs>
-        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-          <polygon points="0 0, 10 3.5, 0 7" fill="#000"/>
-        </marker>
-      </defs>
-      <rect x="${centerX + arrowEndX + 5}" y="${centerY + arrowEndY - 36}" 
-            width="80" height="36" rx="5" ry="5" fill="#000" />
-      <text x="${centerX + arrowEndX + 45}" y="${centerY + arrowEndY - 20}" 
-            fill="#fff" font-size="12" text-anchor="middle" font-family="Arial">
-        ${kmText}
-      </text>
-      <text x="${centerX + arrowEndX + 45}" y="${centerY + arrowEndY - 5}" 
-            fill="#fff" font-size="11" text-anchor="middle" font-family="Arial">
-        ${timeToTargetText}
-      </text>
-    </svg>`;
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="overflow:visible;">
+        <line x1="${centerX}" y1="${centerY}" 
+              x2="${centerX + arrowEndX}" y2="${centerY + arrowEndY}" 
+              stroke="#000" stroke-width="3" marker-end="url(#arrowhead)"/>
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#000"/>
+          </marker>
+        </defs>
+        <rect x="${centerX + arrowEndX + 5}" y="${centerY + arrowEndY - 36}" 
+              width="80" height="36" rx="5" ry="5" fill="#000" />
+        <text x="${centerX + arrowEndX + 45}" y="${centerY + arrowEndY - 20}" 
+              fill="#fff" font-size="12" text-anchor="middle" font-family="Arial">
+          ${kmText}
+        </text>
+        <text x="${centerX + arrowEndX + 45}" y="${centerY + arrowEndY - 5}" 
+              fill="#fff" font-size="11" text-anchor="middle" font-family="Arial">
+          ${timeToTargetText}
+        </text>
+      </svg>`;
 
         const arrowIcon = L.divIcon({
           className: "",
@@ -611,25 +621,39 @@
         return kg.toFixed(3);
       }
 
-      function formatTime(totalSeconds) {
-        const totalSec = Math.floor(totalSeconds);
-        const days = Math.floor(totalSec / 86400);
-        const hours = Math.floor((totalSec % 86400) / 3600);
-        const minutes = Math.floor((totalSec % 3600) / 60);
-        const seconds = totalSec % 60;
-
-        if (days > 0) {
-          return `${days} дн. ${hours} ч. ${minutes} мин.`;
-        } else {
-          return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-        }
+      function formatVirtualDateTime(totalSeconds) {
+        const start = new Date(airshipData.virtualStartTime);
+        const virtualTime = new Date(start.getTime() + totalSeconds * 1000);
+        const dateStr = virtualTime.toLocaleDateString("ru-RU");
+        const timeStr = virtualTime.toTimeString().slice(0, 8);
+        return `${dateStr} ${timeStr}`;
       }
 
       function updateStats() {
+        let timeDiffText = "00:00";
+        if (airshipData.virtualStartTime) {
+          const realElapsedMs = Date.now() - airshipData.virtualStartTime;
+          const virtualElapsedMs = airshipData.virtualElapsedSeconds * 1000;
+          const diffMs = realElapsedMs - virtualElapsedMs;
+
+          if (Math.abs(diffMs) >= 1000) {
+            const totalSec = Math.floor(Math.abs(diffMs) / 1000);
+            const h = Math.floor(totalSec / 3600)
+              .toString()
+              .padStart(2, "0");
+            const m = Math.floor((totalSec % 3600) / 60)
+              .toString()
+              .padStart(2, "0");
+            const sign = diffMs > 0 ? "+" : "-";
+            timeDiffText = `${sign}${h}:${m}`;
+          }
+        }
+
         document.getElementById("stats").innerHTML =
           `Пройдено: ${formatDistance(airshipData.totalDistanceMeters)}<br>` +
           `Уголь: ${formatCoal(airshipData.totalCoalBurned)} / ${formatCoal(airshipData.coalReserve)} кг<br>` +
-          `Время в пути: ${formatTime(airshipData.virtualElapsedSeconds)}`;
+          `Время: ${formatVirtualDateTime(airshipData.virtualElapsedSeconds)}<br>` +
+          `Разница: ${timeDiffText}`;
       }
 
       function updateDisplays() {
@@ -667,6 +691,18 @@
 
         document.getElementById("timeWarpValue").textContent =
           timeWarpFactor + "x";
+        const zoomLabels = [
+          "1x",
+          "2x",
+          "5x",
+          "10x",
+          "100x",
+          "200x",
+          "500x",
+          "1000x",
+        ];
+        document.getElementById("zoomScaleValue").textContent =
+          zoomLabels[currentZoomScaleIndex];
         document.getElementById("pauseBtn").textContent = isPaused
           ? "▶️"
           : "⏸️";
@@ -674,6 +710,8 @@
           airshipData.autopilotEnabled;
         document.getElementById("fastBrakeToggle").checked =
           airshipData.fastBrakeEnabled;
+        document.getElementById("autoSkipToggle").checked =
+          airshipData.autoSkipEnabled;
       }
 
       function runAutopilot() {
@@ -930,54 +968,6 @@
         }
       }
 
-      function skipDays(days) {
-        if (!airshipMarker || days <= 0) return;
-        const secondsToSkip = days * 24 * 3600;
-        skipSimulationTime(secondsToSkip);
-        airshipMarker.setLatLng([airshipData.lat, airshipData.lng]);
-        if (flagMarker)
-          flagMarker.setLatLng([airshipData.lat, airshipData.lng]);
-        updateAirshipIcon();
-        if (airshipData.hasTarget) updateDirectionArrow();
-        updateDisplays();
-        updateStats();
-      }
-
-      function performOfflineFlight() {
-        if (!airshipMarker) return;
-
-        const now = Date.now();
-        if (airshipData.offlineStartTime === null) {
-          airshipData.offlineStartTime = now;
-          document.getElementById("offlineBtn").textContent =
-            "Совершить оффлайн-полёт";
-          localStorage.setItem("airshipState", JSON.stringify(airshipData));
-          alert(
-            "Оффлайн-полёт начат. Вернитесь позже и нажмите эту кнопку снова.",
-          );
-        } else {
-          const elapsedRealMs = now - airshipData.offlineStartTime;
-          const elapsedRealSec = elapsedRealMs / 1000;
-          airshipData.offlineStartTime = null;
-          document.getElementById("offlineBtn").textContent =
-            "Начать оффлайн-полёт";
-
-          skipSimulationTime(elapsedRealSec);
-
-          airshipMarker.setLatLng([airshipData.lat, airshipData.lng]);
-          if (flagMarker)
-            flagMarker.setLatLng([airshipData.lat, airshipData.lng]);
-          updateAirshipIcon();
-          if (airshipData.hasTarget) updateDirectionArrow();
-          updateDisplays();
-          updateStats();
-          localStorage.setItem("airshipState", JSON.stringify(airshipData));
-          alert(
-            `Пропущено ${elapsedRealSec.toFixed(1)} секунд реального времени.`,
-          );
-        }
-      }
-
       function loadCoal() {
         const add = parseFloat(prompt("Сколько кг угля загрузить?", "100"));
         if (!isNaN(add) && add > 0) {
@@ -1014,15 +1004,17 @@
           followEnabled: false,
           autopilotEnabled: false,
           fastBrakeEnabled: false,
+          autoSkipEnabled: false,
+          autoSkipTargetSeconds: 86400,
           startTime: Date.now(),
           totalDistanceMeters: 0,
-          coalReserve: 0,
+          coalReserve: 5000,
           totalCoalBurned: 0,
           hasTarget: false,
           targetLat: null,
           targetLng: null,
           virtualElapsedSeconds: 0,
-          offlineStartTime: null,
+          virtualStartTime: Date.now(),
           enginePower: 0,
           engineReversing: false,
         });
@@ -1030,8 +1022,6 @@
         document.getElementById("controls").style.display = "flex";
         document.getElementById("toggleControlsBtn").style.display = "block";
         document.getElementById("stats").style.display = "block";
-        document.getElementById("offlineBtn").textContent =
-          "Начать оффлайн-полёт";
         document.getElementById("autopilotToggle").disabled = true;
 
         updateDisplays();
@@ -1077,10 +1067,6 @@
                 if (airshipData.hasTarget) {
                   setTarget(airshipData.targetLat, airshipData.targetLng);
                 }
-                if (airshipData.offlineStartTime) {
-                  document.getElementById("offlineBtn").textContent =
-                    "Совершить оффлайн-полёт";
-                }
                 focusOnAirship(12);
                 startAutoSave();
               };
@@ -1093,6 +1079,35 @@
         btnContinue.disabled = true;
       }
 
+      // Вспомогательная функция уведомлений
+      function showNotification(message) {
+        const notify = document.createElement("div");
+        notify.textContent = message;
+        notify.style.cssText = `
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: #4caf50;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 4px;
+      z-index: 1002;
+      opacity: 0;
+      animation: fadeOut 3s forwards;
+    `;
+        notify.style.cssText += `
+      @keyframes fadeOut {
+        0% { opacity: 1; }
+        70% { opacity: 1; }
+        100% { opacity: 0; }
+      }
+    `;
+        document.body.appendChild(notify);
+        setTimeout(() => {
+          if (notify.parentNode) notify.parentNode.removeChild(notify);
+        }, 3000);
+      }
+
       const timeWarpSlider = document.getElementById("timeWarpSlider");
       const timeWarpValue = document.getElementById("timeWarpValue");
       timeWarpSlider.addEventListener("input", () => {
@@ -1101,9 +1116,19 @@
         updateDisplays();
       });
 
+      const zoomScaleSlider = document.getElementById("zoomScaleSlider");
+      const zoomScaleValue = document.getElementById("zoomScaleValue");
+      zoomScaleSlider.addEventListener("input", () => {
+        currentZoomScaleIndex = parseInt(zoomScaleSlider.value);
+        const zoomLevel = ZOOM_SCALE_LEVELS[currentZoomScaleIndex];
+        map.setZoom(zoomLevel);
+        updateDisplays();
+      });
+
       document.getElementById("pauseBtn").addEventListener("click", () => {
         isPaused = !isPaused;
         updateDisplays();
+        startAutoSave(); // ← автосохранение при паузе
       });
 
       const rudderSlider = document.getElementById("rudderSlider");
@@ -1138,6 +1163,15 @@
         });
 
       document
+        .getElementById("autoSkipToggle")
+        .addEventListener("change", function () {
+          airshipData.autoSkipEnabled = this.checked;
+          if (airshipData.autoSkipEnabled) {
+            airshipData.autoSkipTargetSeconds = 86400;
+          }
+        });
+
+      document
         .getElementById("flagToggle")
         .addEventListener("change", function () {
           airshipData.flagEnabled = this.checked;
@@ -1161,6 +1195,106 @@
           }
         });
 
+      // 🔥 ИСПРАВЛЕНО: копирование и вставка
+      document.getElementById("savePosBtn").addEventListener("click", () => {
+        const pos = JSON.stringify({
+          lat: airshipData.lat,
+          lng: airshipData.lng,
+          heading: airshipData.heading,
+        });
+
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard
+            .writeText(pos)
+            .then(() => {
+              showNotification("Позиция сохранена!");
+            })
+            .catch((err) => {
+              console.error("Clipboard error:", err);
+              // Fallback
+              const textArea = document.createElement("textarea");
+              textArea.value = pos;
+              textArea.style.position = "fixed";
+              textArea.style.left = "-9999px";
+              document.body.appendChild(textArea);
+              textArea.select();
+              try {
+                document.execCommand("copy");
+                showNotification("Позиция скопирована!");
+              } catch (err2) {
+                alert("Скопируйте вручную: " + pos);
+              }
+              document.body.removeChild(textArea);
+            });
+        } else {
+          // Fallback для HTTP
+          const textArea = document.createElement("textarea");
+          textArea.value = pos;
+          textArea.style.position = "fixed";
+          textArea.style.left = "-9999px";
+          document.body.appendChild(textArea);
+          textArea.select();
+          try {
+            document.execCommand("copy");
+            showNotification("Позиция скопирована!");
+          } catch (err) {
+            alert("Скопируйте вручную: " + pos);
+          }
+          document.body.removeChild(textArea);
+        }
+      });
+
+      document
+        .getElementById("loadPosBtn")
+        .addEventListener("click", async () => {
+          let text = "";
+          try {
+            if (navigator.clipboard && window.isSecureContext) {
+              text = await navigator.clipboard.readText();
+            } else {
+              // Fallback: ввод вручную
+              text = prompt("Вставьте данные позиции:");
+              if (!text) return;
+            }
+
+            const pos = JSON.parse(text);
+            if (typeof pos.lat === "number" && typeof pos.lng === "number") {
+              airshipData.lat = pos.lat;
+              airshipData.lng = pos.lng;
+              if (typeof pos.heading === "number")
+                airshipData.heading = pos.heading;
+              airshipMarker.setLatLng([pos.lat, pos.lng]);
+              if (flagMarker) flagMarker.setLatLng([pos.lat, pos.lng]);
+              updateAirshipIcon();
+              if (airshipData.hasTarget) updateDirectionArrow();
+              focusOnAirship(12);
+              showNotification("Позиция загружена!");
+            } else {
+              throw new Error("Invalid format");
+            }
+          } catch (e) {
+            alert("Неверный формат позиции в буфере!");
+          }
+        });
+
+      document.getElementById("syncTimeBtn").addEventListener("click", () => {
+        if (!airshipData.virtualStartTime) return;
+
+        const realElapsedMs = Date.now() - airshipData.virtualStartTime;
+        const virtualElapsedMs = airshipData.virtualElapsedSeconds * 1000;
+        const diffMs = realElapsedMs - virtualElapsedMs;
+
+        if (Math.abs(diffMs) > 1000) {
+          const diffSec = Math.abs(diffMs) / 1000;
+          skipSimulationTime(diffSec);
+          showNotification(
+            `Синхронизация завершена! Пропущено ${Math.round(diffSec)} сек.`,
+          );
+        } else {
+          showNotification("Синхронизация не требуется.");
+        }
+      });
+
       document.getElementById("focusBtn").addEventListener("click", () => {
         focusOnAirship(12);
       });
@@ -1174,18 +1308,6 @@
         }
       });
 
-      document.getElementById("skipBtn").addEventListener("click", () => {
-        const daysInput = parseFloat(
-          document.getElementById("skipDaysInput").value,
-        );
-        if (!isNaN(daysInput) && daysInput > 0) {
-          skipDays(daysInput);
-        }
-      });
-
-      document
-        .getElementById("offlineBtn")
-        .addEventListener("click", performOfflineFlight);
       document.getElementById("coalBtn").addEventListener("click", loadCoal);
 
       document
@@ -1221,6 +1343,19 @@
 
         if (airshipData.autopilotEnabled) {
           runAutopilot();
+        }
+
+        if (
+          airshipData.autoSkipEnabled &&
+          timeWarpFactor > 1 &&
+          airshipData.autoSkipTargetSeconds > 0
+        ) {
+          const secondsPassed = dtSimulated;
+          airshipData.autoSkipTargetSeconds -= secondsPassed;
+          if (airshipData.autoSkipTargetSeconds <= 0) {
+            airshipData.autoSkipEnabled = false;
+            document.getElementById("autoSkipToggle").checked = false;
+          }
         }
 
         const currentSign = Math.sign(airshipData.enginePower);
