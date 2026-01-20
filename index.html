@@ -290,7 +290,6 @@
         <label><input type="checkbox" id="autopilotToggle" /> Автопилот</label>
         <button id="focusBtn">К дирижаблю</button>
         <button id="targetBtn">Добавить маркер</button>
-        <button id="syncTimeBtn">⏱️ Синхр.</button>
         <button id="coalBtn" class="coal-btn">Загрузить уголь</button>
         <button id="newGameBtn">🆕 Новая игра</button>
       </div>
@@ -1050,7 +1049,7 @@
           fastBrakeEnabled: false,
           startTime: Date.now(),
           totalDistanceMeters: 0,
-          coalReserve: 5000,
+          coalReserve: 0,
           totalCoalBurned: 0,
           hasTarget: false,
           targetLat: null,
@@ -1314,24 +1313,6 @@
             alert("Сначала установите цель!");
           }
         });
-
-      document.getElementById("syncTimeBtn").addEventListener("click", () => {
-        if (!airshipData.virtualStartTime) return;
-
-        const realElapsedMs = Date.now() - airshipData.virtualStartTime;
-        const virtualElapsedMs = airshipData.virtualElapsedSeconds * 1000;
-        const diffMs = realElapsedMs - virtualElapsedMs;
-
-        if (Math.abs(diffMs) > 1000) {
-          const diffSec = Math.abs(diffMs) / 1000;
-          skipSimulationTime(diffSec);
-          alert(
-            `Синхронизация завершена! Пропущено ${Math.round(diffSec)} сек.`,
-          );
-        } else {
-          alert("Синхронизация не требуется.");
-        }
-      });
 
       document.getElementById("focusBtn").addEventListener("click", () => {
         focusOnAirship(12);
