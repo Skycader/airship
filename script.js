@@ -40,7 +40,7 @@ const MIN_TURN_RATE = 0.3;
 const PROPELLER_BASE_SCALE = 4.0;
 
 // === ВЕТЕР ===
-let windSpeedBf = 3;
+let windSpeedBf = 0;
 let windDirection = 0;
 let windMode = "auto";
 
@@ -69,7 +69,7 @@ let airshipData = {
   virtualStartTime: null,
   enginePower: 0,
   groundSpeed: 0,
-  driftAngle: 0,
+  windLastVirtualUpdate: 0,
 };
 
 // === ИКОНКИ ===
@@ -114,10 +114,9 @@ function beaufortToMps(bf) {
   return scale[Math.min(12, Math.max(0, Math.round(bf)))];
 }
 
-// 🔥 НОВАЯ ФУНКЦИЯ: вращение пропеллеров
 function calculatePropellerRPM() {
   if (Math.abs(airshipData.enginePower) < 0.1) return 0;
-  return airshipData.enginePower * 16.5; // 100% → 1650 RPM
+  return airshipData.enginePower * 16.5;
 }
 
 // === ГРАФИКА ===
@@ -140,9 +139,6 @@ function getAirshipSvg(zoom, heading, propRotationAngle) {
   const offsetX = widthPx * 0.15;
   const leftPropX = widthPx / 2 - offsetX;
   const rightPropX = widthPx / 2 + offsetX;
-
-  // Убран компас цели на носу
-  // Убран компас ветра на дирижабле
 
   return `
     <svg viewBox="0 0 ${widthPx} ${lengthPx}" 
@@ -388,7 +384,7 @@ function updateDisplays() {
   rudderValue.textContent = airshipData.rudder.toFixed(1) + "°";
   throttleValue.textContent = throttleLabels[airshipData.throttle] || "STOP";
 
-  // ✅ Спидометр показывает groundSpeed (реальную скорость по земле)
+  // ✅ Скорость с направлением
   const speedDisplay =
     airshipData.groundSpeed >= 0
       ? airshipData.groundSpeed.toFixed(1) + " км/ч"
@@ -443,7 +439,7 @@ function updateWindCompass() {
 
   const windSpeedKmh = beaufortToMps(windSpeedBf) * 3.6;
   const windSpeedText =
-    windSpeedKmh > 0 ? `(${windSpeedKmh.toFixed(0)} км/ч)` : "";
+    windSpeedKmh > 0 ? `(${windSpeedKmh.toFixed(0)} км/ч)` : "Штиль";
 
   const compassSvg = `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
@@ -470,19 +466,16 @@ function applyWindEffect(dt) {
   const windSpeedMs = beaufortToMps(windSpeedBf);
   const windAngleRad = (windDirection * Math.PI) / 180;
 
-  // Смещение от ветра (в метрах за dt секунд)
   const driftX = windSpeedMs * Math.sin(windAngleRad) * dt;
   const driftY = windSpeedMs * Math.cos(windAngleRad) * dt;
 
-  // Преобразуем в градусы
   const earthRadius = 6378137;
   airshipData.lat += (driftY / earthRadius) * (180 / Math.PI);
   airshipData.lng +=
     ((driftX / earthRadius) * (180 / Math.PI)) /
     Math.cos((airshipData.lat * Math.PI) / 180);
 
-  // === КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: сохраняем направление ===
-  const shipSpeedMs = airshipData.speed / 3.6; // может быть отрицательным!
+  const shipSpeedMs = airshipData.speed / 3.6;
   const shipAngleRad = (airshipData.heading * Math.PI) / 180;
   const shipX = shipSpeedMs * Math.sin(shipAngleRad);
   const shipY = shipSpeedMs * Math.cos(shipAngleRad);
@@ -490,16 +483,13 @@ function applyWindEffect(dt) {
   const totalX = shipX + windSpeedMs * Math.sin(windAngleRad);
   const totalY = shipY + windSpeedMs * Math.cos(windAngleRad);
 
-  // Скорость по земле с учётом направления
   const groundSpeedMs = Math.sqrt(totalX * totalX + totalY * totalY);
   const groundSpeedKmh = groundSpeedMs * 3.6;
 
-  // Определяем, движется ли дирижабль вперёд или назад относительно своего курса
   const courseAngleRad = (airshipData.heading * Math.PI) / 180;
   const dotProduct =
     totalX * Math.sin(courseAngleRad) + totalY * Math.cos(courseAngleRad);
 
-  // Если проекция скорости на курс отрицательна — движемся назад
   airshipData.groundSpeed = dotProduct >= 0 ? groundSpeedKmh : -groundSpeedKmh;
 }
 
@@ -567,16 +557,71 @@ function simulateStep() {
   airshipData.virtualElapsedSeconds += dtSimulated;
   airshipData.lastUpdate = now;
 
-  // Обновление ветра в авто-режиме
+  // === АВТОМАТИЧЕСКИЙ ВЕТЕР (каждую минуту виртуального времени) ===
   if (windMode === "auto") {
-    const nowMs = Date.now();
-    if (!airshipData.windLastUpdate) airshipData.windLastUpdate = nowMs;
-    if (nowMs - airshipData.windLastUpdate > 30000) {
-      windSpeedBf += (Math.random() - 0.5) * 0.5;
-      windDirection += (Math.random() - 0.5) * 10;
+    const virtualTime = airshipData.virtualElapsedSeconds;
+    if (virtualTime - (airshipData.windLastVirtualUpdate || 0) >= 60) {
+      // каждые 60 сек
+      let changed = false;
+
+      // 1% шанс резкой смены направления
+      if (Math.random() < 0.1) {
+        windDirection = Math.floor(Math.random() * 360);
+        changed = true;
+      }
+
+      // 1% шанс резкой смены силы (с распределением: слабый — чаще)
+      if (Math.random() < 0.1) {
+        // Распределение: веса для каждого уровня ветра (0–12)
+        const windWeights = [
+          10, // 0 — штиль
+          9, // 1
+          8, // 2
+          7, // 3
+          6, // 4
+          5, // 5
+          4, // 6
+          3, // 7
+          2, // 8
+          1.5, // 9
+          1, // 10
+          0.5, // 11
+          0.2, // 12 — ураган
+        ];
+
+        // Вычисляем кумулятивную сумму весов
+        const totalWeight = windWeights.reduce((a, b) => a + b, 0);
+        let rand = Math.random() * totalWeight;
+        let bf = 0;
+        for (let i = 0; i < windWeights.length; i++) {
+          if (rand < windWeights[i]) {
+            bf = i;
+            break;
+          }
+          rand -= windWeights[i];
+        }
+
+        windSpeedBf = bf;
+        changed = true;
+      }
+
+      // Если не было резкого изменения — плавное
+      if (!changed) {
+        windSpeedBf += (Math.random() - 0.5) * 0.3; // ±0.15 балла
+        windDirection += (Math.random() - 0.5) * 8; // ±4 градуса
+      }
+
+      // Ограничения
       windSpeedBf = Math.max(0, Math.min(12, windSpeedBf));
       windDirection = ((windDirection % 360) + 360) % 360;
-      airshipData.windLastUpdate = nowMs;
+
+      // Сохраняем время последнего обновления
+      airshipData.windLastVirtualUpdate = virtualTime;
+
+      // Обновляем компас ветра (если есть)
+      if (typeof updateWindCompass === "function") {
+        updateWindCompass();
+      }
     }
   }
 
@@ -645,7 +690,6 @@ function simulateStep() {
     }
   }
 
-  // Обновление скорости
   const { speed: targetSpeed } = interpolateFuelAndSpeed(
     Math.abs(airshipData.enginePower),
   );
@@ -690,7 +734,6 @@ function simulateStep() {
     }
   }
 
-  // Поворот
   if (Math.abs(airshipData.speed) > 0.1) {
     const turnRate =
       MIN_TURN_RATE +
@@ -716,7 +759,6 @@ function simulateStep() {
       airshipData.angularVelocity = 0;
   }
 
-  // Пропеллеры
   const rpm = calculatePropellerRPM();
   if (rpm !== 0) {
     const rotationPerSecond = (Math.abs(rpm) * 360) / 60;
@@ -725,7 +767,6 @@ function simulateStep() {
     airshipData.propRotationAngle %= 360;
   }
 
-  // Перемещение с учётом ветра
   applyWindEffect(dtSimulated);
   const distanceKm = (Math.abs(airshipData.groundSpeed) * dtSimulated) / 3600;
   const distanceMeters = distanceKm * 1000;
@@ -758,7 +799,7 @@ function simulateStep() {
   updateDisplays();
   updateAirshipIcon();
   updateStats();
-  updateWindCompass(); // ← обновляем компас ветра
+  updateWindCompass();
 }
 
 // === ЗАПУСК И УПРАВЛЕНИЕ ===
@@ -812,7 +853,7 @@ function spawnAirship(lat, lng) {
     virtualStartTime: Date.now(),
     enginePower: 0,
     groundSpeed: 0,
-    driftAngle: 0,
+    windLastVirtualUpdate: 0,
   });
 
   document.getElementById("controls").style.display = "flex";
@@ -1085,6 +1126,18 @@ const windDirectionValue = document.getElementById("windDirectionValue");
 windDirectionSlider.addEventListener("input", () => {
   windDirection = parseInt(windDirectionSlider.value);
   windDirectionValue.textContent = windDirection + "°";
+  updateWindCompass();
+});
+
+// Кнопка "Случайный ветер"
+document.getElementById("randomWindBtn").addEventListener("click", () => {
+  windSpeedBf += (Math.random() - 0.5) * 0.6; // ±0.3 балла
+  windDirection += (Math.random() - 0.5) * 15; // ±7.5 градусов
+  windSpeedBf = Math.max(0, Math.min(12, windSpeedBf));
+  windDirection = ((windDirection % 360) + 360) % 360;
+  document.getElementById("windSpeedSelect").value = Math.round(windSpeedBf);
+  windDirectionSlider.value = Math.round(windDirection);
+  windDirectionValue.textContent = Math.round(windDirection) + "°";
   updateWindCompass();
 });
 
