@@ -1,191 +1,358 @@
 <!doctype html>
 <html lang="ru">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Симулятор дирижабля «Гитэнюург»</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      overflow: hidden;
-      font-family: 'Segoe UI', Tahoma, sans-serif;
-      background: #000;
-    }
-    #map { height: 100%; width: 100%; }
-    #start-menu {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.9); display: flex; flex-direction: column;
-      justify-content: center; align-items: center; z-index: 2000; color: white;
-    }
-    #start-menu h1 { font-size: 28px; margin-bottom: 30px; color: #4fc3f7; }
-    #start-menu button {
-      padding: 12px 30px; font-size: 18px; margin: 10px;
-      background: #1e88e5; color: white; border: none; border-radius: 6px; cursor: pointer;
-    }
-    #start-menu button:hover { background: #1976d2; }
-    #start-menu button:disabled { background: #555; cursor: not-allowed; }
-    #controls {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      background: rgba(0, 0, 0, 0.85); color: white; padding: 12px;
-      display: none; justify-content: space-around; align-items: center;
-      flex-wrap: wrap; gap: 15px; z-index: 1000; pointer-events: auto;
-    }
-    .control-group {
-      display: flex; flex-direction: column; align-items: center; color: white; min-width: 120px;
-    }
-    .slider { width: 100px; margin: 5px 0; }
-    .label { font-size: 13px; margin-top: 4px; color: #aaa; }
-    .value-display { font-size: 16px; font-weight: bold; color: #0ff; margin-top: 2px; }
-    .speed-display { font-size: 18px; font-weight: bold; color: #0f0; }
-    .flag-control {
-      display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
-    }
-    .skip-input {
-      width: 80px; padding: 4px; text-align: center; font-size: 14px;
-    }
-    .skip-btn, .coal-btn, .pause-btn {
-      margin-top: 4px; padding: 4px 10px; font-size: 12px;
-      background: #555; color: white; border: none; border-radius: 3px; cursor: pointer;
-    }
-    .skip-btn:hover, .coal-btn:hover, .pause-btn:hover { background: #777; }
-    #toggleControlsBtn {
-      position: fixed; bottom: 10px; right: 10px; width: 40px; height: 40px;
-      background: rgba(0, 0, 0, 0.7); color: white; border: none; border-radius: 50%;
-      font-size: 20px; cursor: pointer; z-index: 1001; display: none;
-    }
-    #stats {
-      position: fixed; top: 10px; right: 10px;
-      background: rgba(0, 0, 0, 0.7); color: white; padding: 8px 12px;
-      border-radius: 6px; font-size: 14px; z-index: 1001; pointer-events: none;
-    }
-    #windCompass {
-      position: fixed; top: 90px; right: 10px;
-      width: 120px; height: 120px; z-index: 1001;
-    }
-    #windControls {
-      position: fixed; top: 220px; right: 10px;
-      background: rgba(0, 0, 0, 0.7); color: white; padding: 8px;
-      border-radius: 6px; font-size: 12px; z-index: 1001;
-    }
-    #windControls select, #windControls input {
-      font-size: 12px; margin-top: 4px;
-    }
-    .leaflet-div-icon { overflow: visible !important; }
-  </style>
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Симулятор дирижабля «Гитэнюург»</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        background: #000;
+      }
+      #map {
+        height: 100%;
+        width: 100%;
+      }
+      #start-menu {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 2000;
+        color: white;
+      }
+      #start-menu h1 {
+        font-size: 28px;
+        margin-bottom: 30px;
+        color: #4fc3f7;
+      }
+      #start-menu button {
+        padding: 12px 30px;
+        font-size: 18px;
+        margin: 10px;
+        background: #1e88e5;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #start-menu button:hover {
+        background: #1976d2;
+      }
+      #start-menu button:disabled {
+        background: #555;
+        cursor: not-allowed;
+      }
+      #controls {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.85);
+        color: white;
+        padding: 12px;
+        display: none;
+        justify-content: space-around;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+        z-index: 1000;
+        pointer-events: auto;
+      }
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        color: white;
+        min-width: 120px;
+      }
+      .slider {
+        width: 100px;
+        margin: 5px 0;
+      }
+      .label {
+        font-size: 13px;
+        margin-top: 4px;
+        color: #aaa;
+      }
+      .value-display {
+        font-size: 16px;
+        font-weight: bold;
+        color: #0ff;
+        margin-top: 2px;
+      }
+      .speed-display {
+        font-size: 18px;
+        font-weight: bold;
+        color: #0f0;
+      }
+      .flag-control,
+      .wind-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .skip-input {
+        width: 80px;
+        padding: 4px;
+        text-align: center;
+        font-size: 14px;
+      }
+      .skip-btn,
+      .coal-btn,
+      .pause-btn {
+        margin-top: 4px;
+        padding: 4px 10px;
+        font-size: 12px;
+        background: #555;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      .skip-btn:hover,
+      .coal-btn:hover,
+      .pause-btn:hover {
+        background: #777;
+      }
+      #toggleControlsBtn {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        width: 40px;
+        height: 40px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        font-size: 20px;
+        cursor: pointer;
+        z-index: 1001;
+        display: none;
+      }
+      #stats {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        z-index: 1001;
+        pointer-events: none;
+      }
+      #windCompass {
+        position: fixed;
+        top: 90px;
+        right: 10px;
+        width: 120px;
+        height: 120px;
+        z-index: 1001;
+      }
+      #windControls {
+        position: fixed;
+        top: 220px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        z-index: 1001;
+      }
+      #windControls select,
+      #windControls input,
+      #windControls button {
+        font-size: 12px;
+        margin-top: 4px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .leaflet-div-icon {
+        overflow: visible !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
 
-<div id="map"></div>
+    <div id="start-menu">
+      <h1>Симулятор дирижабля «Гитэнюург»</h1>
+      <button id="btn-new">Начать новую игру</button>
+      <button id="btn-continue" disabled>Продолжить</button>
+    </div>
 
-<div id="start-menu">
-  <h1>Симулятор дирижабля «Гитэнюург»</h1>
-  <button id="btn-new">Начать новую игру</button>
-  <button id="btn-continue" disabled>Продолжить</button>
-</div>
+    <div id="controls">
+      <div class="control-group">
+        <input
+          type="range"
+          min="-5"
+          max="5"
+          value="0"
+          step="1"
+          class="slider"
+          id="rudderSlider"
+        />
+        <div class="value-display" id="rudderValue">0.0°</div>
+        <div class="label">Штурвал (±0.5°)</div>
+      </div>
 
-<div id="controls">
-  <div class="control-group">
-    <input type="range" min="-5" max="5" value="0" step="1" class="slider" id="rudderSlider" />
-    <div class="value-display" id="rudderValue">0.0°</div>
-    <div class="label">Штурвал (±0.5°)</div>
-  </div>
+      <div class="control-group">
+        <input
+          type="range"
+          min="-5"
+          max="5"
+          value="0"
+          step="1"
+          class="slider"
+          id="throttleSlider"
+        />
+        <div class="value-display" id="throttleValue">STOP</div>
+        <div class="label">Мощность двигателей</div>
+      </div>
 
-  <div class="control-group">
-    <input type="range" min="-5" max="5" value="0" step="1" class="slider" id="throttleSlider" />
-    <div class="value-display" id="throttleValue">STOP</div>
-    <div class="label">Мощность двигателей</div>
-  </div>
+      <div class="control-group">
+        <label
+          ><input type="checkbox" id="fastBrakeToggle" /> Быстрое
+          торможение</label
+        >
+      </div>
 
-  <div class="control-group">
-    <label><input type="checkbox" id="fastBrakeToggle" /> Быстрое торможение</label>
-  </div>
+      <div class="control-group">
+        <label
+          ><input type="checkbox" id="anchorToggle" checked /> Стоит на
+          якоре</label
+        >
+      </div>
 
-  <div class="control-group">
-    <div class="speed-display" id="speedometer">0 км/ч</div>
-    <div class="label">Скорость (по земле)</div>
-  </div>
+      <div class="control-group">
+        <div class="speed-display" id="speedometer">0 км/ч</div>
+        <div class="label">Скорость (по земле)</div>
+      </div>
 
-  <div class="control-group">
-    <div class="value-display" id="enginePowerDisplay">0%</div>
-    <div class="label">Мощность двигателей</div>
-  </div>
+      <div class="control-group">
+        <div class="value-display" id="enginePowerDisplay">0%</div>
+        <div class="label">Мощность двигателей</div>
+      </div>
 
-  <div class="control-group">
-    <div class="value-display" id="compass">0° (0°)</div>
-    <div class="label">Курс (откл.)</div>
-  </div>
+      <div class="control-group">
+        <div class="value-display" id="compass">0° (0°)</div>
+        <div class="label">Курс (откл.)</div>
+      </div>
 
-  <div class="control-group">
-    <input type="range" id="timeWarpSlider" class="slider" min="0" max="14" step="1" value="1" />
-    <div class="value-display" id="timeWarpValue">1x</div>
-    <div class="label">Ускорение</div>
-  </div>
+      <div class="control-group">
+        <input
+          type="range"
+          id="timeWarpSlider"
+          class="slider"
+          min="0"
+          max="14"
+          step="1"
+          value="1"
+        />
+        <div class="value-display" id="timeWarpValue">1x</div>
+        <div class="label">Ускорение</div>
+      </div>
 
-  <div class="control-group">
-    <input type="range" id="zoomScaleSlider" class="slider" min="0" max="7" step="1" value="7" />
-    <div class="value-display" id="zoomScaleValue">1x</div>
-    <div class="label">Масштаб</div>
-  </div>
+      <div class="control-group">
+        <input
+          type="range"
+          id="zoomScaleSlider"
+          class="slider"
+          min="0"
+          max="7"
+          step="1"
+          value="7"
+        />
+        <div class="value-display" id="zoomScaleValue">1x</div>
+        <div class="label">Масштаб</div>
+      </div>
 
-  <div class="control-group">
-    <button id="pauseBtn" class="pause-btn">⏸️</button>
-    <div class="label">Пауза</div>
-  </div>
+      <div class="control-group">
+        <button id="pauseBtn" class="pause-btn">⏸️</button>
+        <div class="label">Пауза</div>
+      </div>
 
-  <div class="control-group">
-    <label><input type="checkbox" id="anchorToggle" checked /> Стоит на якоре</label>
-  </div>
+      <div class="control-group flag-control">
+        <label><input type="checkbox" id="flagToggle" /> Флаг</label>
+        <label><input type="checkbox" id="followToggle" /> Следовать</label>
+        <label><input type="checkbox" id="autopilotToggle" /> Автопилот</label>
+        <button id="focusBtn">К дирижаблю</button>
+        <button id="targetBtn">Добавить маркер</button>
+        <button id="fuelBtn" class="coal-btn">Заправить дизель</button>
+        <button id="newGameBtn">🆕 Новая игра</button>
+      </div>
+    </div>
 
-  <div class="control-group flag-control">
-    <label><input type="checkbox" id="flagToggle" /> Флаг</label>
-    <label><input type="checkbox" id="followToggle" /> Следовать</label>
-    <label><input type="checkbox" id="autopilotToggle" /> Автопилот</label>
-    <button id="focusBtn">К дирижаблю</button>
-    <button id="targetBtn">Добавить маркер</button>
-    <button id="fuelBtn" class="coal-btn">Заправить дизель</button>
-    <button id="newGameBtn">🆕 Новая игра</button>
-  </div>
-</div>
+    <button id="toggleControlsBtn">^</button>
 
-<button id="toggleControlsBtn">^</button>
+    <div id="stats">
+      Пройдено: 0 км 0 м<br />
+      Дизель: 0.000 / 0.000 л<br />
+      Время: 01.05.1936, 08:00:00
+    </div>
 
-<div id="stats">
-  Пройдено: 0 км 0 м<br />
-  Дизель: 0.000 / 0.000 л<br />
-  Время в пути: 00:00:00
-</div>
+    <div id="windCompass"></div>
 
-<div id="windCompass"></div>
+    <div id="windControls">
+      <label
+        ><input type="radio" name="windMode" value="auto" checked /> Авто</label
+      >
+      <label
+        ><input type="radio" name="windMode" value="manual" /> Ручной</label
+      >
+      <div id="manualWindInputs" style="display: none; margin-top: 5px">
+        <select id="windSpeedSelect" style="width: 120px; font-size: 12px">
+          <option value="0">0/12 Штиль (0 км/ч)</option>
+          <option value="1">1/12 слабый (5 км/ч)</option>
+          <option value="2">2/12 лёгкий (10 км/ч)</option>
+          <option value="3">3/12 слабый (15 км/ч)</option>
+          <option value="4">4/12 умеренный (20 км/ч)</option>
+          <option value="5">5/12 свежий (28 км/ч)</option>
+          <option value="6">6/12 сильный (38 км/ч)</option>
+          <option value="7">7/12 крепкий (49 км/ч)</option>
+          <option value="8">8/12 очень крепкий (61 км/ч)</option>
+          <option value="9">9/12 шторм (74 км/ч)</option>
+          <option value="10">10/12 сильный шторм (88 км/ч)</option>
+          <option value="11">11/12 жестокий шторм (102 км/ч)</option>
+          <option value="12">12/12 ураган (117+ км/ч)</option>
+        </select>
+        <br />
+        <input
+          type="range"
+          id="windDirectionSlider"
+          min="0"
+          max="360"
+          value="0"
+          style="width: 100px"
+        />
+        <span id="windDirectionValue">0°</span>
+        <br />
+        <button id="randomWindBtn" style="margin-top: 5px; font-size: 12px">
+          Случайный ветер
+        </button>
+      </div>
+    </div>
 
-<div id="windControls">
-  <label><input type="radio" name="windMode" value="auto" checked /> Авто</label>
-  <label><input type="radio" name="windMode" value="manual" /> Ручной</label>
-  <div id="manualWindInputs" style="display:none; margin-top:5px;">
-    <select id="windSpeedSelect" style="width:120px;font-size:12px;">
-      <option value="0">0/12 штиль (0 км/ч)</option>
-      <option value="1">1/12 слабый (5 км/ч)</option>
-      <option value="2">2/12 лёгкий (10 км/ч)</option>
-      <option value="3" selected>3/12 слабый (15 км/ч)</option>
-      <option value="4">4/12 умеренный (20 км/ч)</option>
-      <option value="5">5/12 свежий (28 км/ч)</option>
-      <option value="6">6/12 сильный (38 км/ч)</option>
-      <option value="7">7/12 крепкий (49 км/ч)</option>
-      <option value="8">8/12 очень крепкий (61 км/ч)</option>
-      <option value="9">9/12 шторм (74 км/ч)</option>
-      <option value="10">10/12 сильный шторм (88 км/ч)</option>
-      <option value="11">11/12 жестокий шторм (102 км/ч)</option>
-      <option value="12">12/12 ураган (117+ км/ч)</option>
-    </select>
-    <br />
-    <input type="range" id="windDirectionSlider" min="0" max="360" value="0" style="width:100px;" />
-    <button id="randomWindBtn" style="margin-top:5px;font-size:12px;">Случайный ветер</button>
-    <span id="windDirectionValue">0°</span>
-  </div>
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="script.js"></script>
-<script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

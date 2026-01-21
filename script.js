@@ -53,25 +53,26 @@ let airshipData = {
   throttle: 0,
   rudder: 0,
   angularVelocity: 0,
-  lastUpdate: Date.now(),
   propRotationAngle: 0,
   flagEnabled: false,
   followEnabled: false,
   autopilotEnabled: false,
   fastBrakeEnabled: false,
-  startTime: null,
+  anchorEnabled: true,
   totalDistanceMeters: 0,
-  fuelReserve: 0,
+  fuelReserve: 100, // ✅ по умолчанию 100 литров
   totalFuelBurned: 0,
   hasTarget: false,
   targetLat: null,
   targetLng: null,
-  virtualStartTime: null,
   enginePower: 0,
   groundSpeed: 0,
   windLastVirtualUpdate: 0,
-  virtualElapsedSeconds: 0,
-  anchorEnabled: true,
+
+  // === ВИРТУАЛЬНОЕ ВРЕМЯ ===
+  virtualTimeSeconds: 0,
+  virtualStartDate: new Date(), // ✅ текущая реальная дата
+  lastSimulateTime: performance.now(), // для точного времени на фоне
 };
 
 // === ИКОНКИ ===
@@ -133,7 +134,7 @@ function getAirshipSvg(zoom, heading, propRotationAngle) {
   const metersPerPixel =
     (156543.03392 * Math.cos((airshipData.lat * Math.PI) / 180)) /
     Math.pow(2, zoom);
-  const lengthPx = 245 / metersPerPixel;
+  const lengthPx = 500 / metersPerPixel;
   const widthPx = lengthPx * 0.22;
 
   const propSize = widthPx * 0.3;
@@ -319,20 +320,6 @@ function formatFuel(liters) {
   return liters.toFixed(3);
 }
 
-function formatTime(totalSeconds) {
-  const totalSec = Math.floor(totalSeconds);
-  const days = Math.floor(totalSec / 86400);
-  const hours = Math.floor((totalSec % 86400) / 3600);
-  const minutes = Math.floor((totalSec % 3600) / 60);
-  const seconds = totalSec % 60;
-
-  if (days > 0) {
-    return `${days} дн. ${hours} ч. ${minutes} мин.`;
-  } else {
-    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-  }
-}
-
 function calculateFuelTimeRemaining() {
   if (airshipData.fuelReserve <= 0) return "00:00";
   const powerPercent = Math.abs(airshipData.enginePower);
@@ -351,14 +338,27 @@ function calculateFuelTimeRemaining() {
   return `${h}:${m}`;
 }
 
-function updateStats() {
-  const elapsedTime = (Date.now() - airshipData.startTime) / 1000;
-  const fuelTime = calculateFuelTimeRemaining();
+function formatVirtualDateTime() {
+  const virtualDate = new Date(airshipData.virtualStartDate);
+  virtualDate.setSeconds(
+    virtualDate.getSeconds() + Math.floor(airshipData.virtualTimeSeconds),
+  );
+  return virtualDate.toLocaleString("ru-RU", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
 
+function updateStats() {
+  const fuelTime = calculateFuelTimeRemaining();
   document.getElementById("stats").innerHTML =
     `Пройдено: ${formatDistance(airshipData.totalDistanceMeters)}<br>` +
     `Дизель: ${formatFuel(airshipData.totalFuelBurned)} / ${formatFuel(airshipData.fuelReserve)} л (${fuelTime})<br>` +
-    `Время в пути: ${formatTime(elapsedTime)}`;
+    `Время: ${formatVirtualDateTime()}`;
 }
 
 function updateDisplays() {
@@ -386,7 +386,6 @@ function updateDisplays() {
   rudderValue.textContent = airshipData.rudder.toFixed(1) + "°";
   throttleValue.textContent = throttleLabels[airshipData.throttle] || "STOP";
 
-  // ✅ Скорость с направлением
   const speedDisplay =
     airshipData.groundSpeed >= 0
       ? airshipData.groundSpeed.toFixed(1) + " км/ч"
@@ -422,18 +421,19 @@ function updateDisplays() {
   document.getElementById("zoomScaleValue").textContent =
     zoomLabels[currentZoomScaleIndex];
   document.getElementById("pauseBtn").textContent = isPaused ? "▶️" : "⏸️";
-  document.getElementById("autopilotToggle").checked =
-    airshipData.autopilotEnabled;
-  document.getElementById("fastBrakeToggle").checked =
-    airshipData.fastBrakeEnabled;
 
-  // Блокировка управления при якоре
   const isAnchored = airshipData.anchorEnabled;
   document.getElementById("rudderSlider").disabled = isAnchored;
   document.getElementById("throttleSlider").disabled = isAnchored;
   document.getElementById("fastBrakeToggle").disabled = isAnchored;
   document.getElementById("autopilotToggle").disabled =
     isAnchored || !airshipData.hasTarget;
+
+  document.getElementById("autopilotToggle").checked =
+    airshipData.autopilotEnabled;
+  document.getElementById("fastBrakeToggle").checked =
+    airshipData.fastBrakeEnabled;
+  document.getElementById("anchorToggle").checked = airshipData.anchorEnabled;
 }
 
 // === КОМПАС ВЕТРА ===
@@ -449,7 +449,7 @@ function updateWindCompass() {
 
   const windSpeedKmh = beaufortToMps(windSpeedBf) * 3.6;
   const windSpeedText =
-    windSpeedKmh > 0 ? `(${windSpeedKmh.toFixed(0)} км/ч)` : "(0 км/ч)";
+    windSpeedBf === 0 ? "(Штиль)" : `(${windSpeedKmh.toFixed(0)} км/ч)`;
 
   const compassSvg = `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
@@ -473,12 +473,6 @@ function updateWindCompass() {
 // === ФИЗИКА И ВЕТЕР ===
 
 function applyWindEffect(dt) {
-  // Если на якоре — ветер не действует
-  if (airshipData.anchorEnabled) {
-    airshipData.groundSpeed = airshipData.speed; // просто копируем внутреннюю скорость
-    return;
-  }
-
   const windSpeedMs = beaufortToMps(windSpeedBf);
   const windAngleRad = (windDirection * Math.PI) / 180;
 
@@ -510,23 +504,11 @@ function applyWindEffect(dt) {
 }
 
 function runAutopilot() {
-  if (
-    !airshipData.hasTarget ||
-    !airshipData.autopilotEnabled ||
-    airshipData.fuelReserve <= 0
-  ) {
-    // Если нет топлива — выключаем автопилот
-    airshipData.throttle = 0;
+  if (!airshipData.hasTarget || airshipData.fuelReserve <= 0) {
     document.getElementById("throttleSlider").value = 0;
+    throttleSlider.dispatchEvent(new Event("input"));
     return;
   }
-
-  if (
-    !airshipData.hasTarget ||
-    !airshipData.autopilotEnabled ||
-    airshipData.fuelReserve <= 0
-  )
-    return;
 
   const R = 6378137;
   const lat1 = (airshipData.lat * Math.PI) / 180;
@@ -545,88 +527,100 @@ function runAutopilot() {
   const dy = R * (Math.sin(lat2) - Math.sin(lat1));
   const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
 
-  let headingError = bearingToTarget - airshipData.heading;
-  if (headingError > 180) headingError -= 360;
-  if (headingError < -180) headingError += 360;
+  // === ФАЗА 1: ПОЛЁТ (> 1 км) ===
+  if (distanceToTarget > 1000) {
+    // Коррекция курса
+    let headingError = bearingToTarget - airshipData.heading;
+    if (headingError > 180) headingError -= 360;
+    if (headingError < -180) headingError += 360;
 
-  let rudderCommand = headingError * 0.01;
-  rudderCommand = Math.max(-0.5, Math.min(0.5, rudderCommand));
-  airshipData.rudder = rudderCommand;
+    let rudderCommand = headingError * 0.01;
+    rudderCommand = Math.max(-0.5, Math.min(0.5, rudderCommand));
+    airshipData.rudder = rudderCommand;
+    document.getElementById("rudderSlider").value = Math.round(
+      rudderCommand * 10,
+    );
 
-  const speedMs = airshipData.speed / 3.6;
-  const decel = 0.8 / 3.6;
-  const brakingDistance = (speedMs * speedMs) / (2 * decel);
-
-  let throttleCommand = 0;
-  if (distanceToTarget < 100) {
-    throttleCommand = 0;
-  } else if (distanceToTarget < brakingDistance + 500) {
-    throttleCommand = -5;
-  } else {
-    throttleCommand = 5;
+    // Вперёд
+    document.getElementById("throttleSlider").value = 5;
+    throttleSlider.dispatchEvent(new Event("input"));
   }
+  // === ФАЗА 2: ТОРМОЖЕНИЕ (≤ 1 км) ===
+  else if (Math.abs(airshipData.groundSpeed) > 15) {
+    // Руль прямо
+    airshipData.rudder = 0;
+    document.getElementById("rudderSlider").value = 0;
 
-  airshipData.throttle = Math.round(throttleCommand);
-  document.getElementById("rudderSlider").value = Math.round(
-    rudderCommand * 10,
-  );
-  document.getElementById("throttleSlider").value = airshipData.throttle;
+    // Быстрое торможение (реверс)
+    document.getElementById("throttleSlider").value = -5;
+    throttleSlider.dispatchEvent(new Event("input"));
+  }
+  // === ФАЗА 3: ОСТАНОВКА И ЯКОРЬ (≤ 15 км/ч) ===
+  else {
+    // Остановка
+    document.getElementById("throttleSlider").value = 0;
+    throttleSlider.dispatchEvent(new Event("input"));
+
+    // Бросаем якорь
+    airshipData.anchorEnabled = true;
+    document.getElementById("anchorToggle").checked = true;
+
+    // Выключаем автопилот
+    airshipData.autopilotEnabled = false;
+    document.getElementById("autopilotToggle").checked = false;
+
+    // Обновляем UI
+    updateDisplays();
+  }
 }
-
 // === ОСНОВНОЙ ЦИКЛ ===
 
 function simulateStep() {
-  if (isPaused) return;
-  // 🔥 Если нет топлива — глушим двигатель
-  if (airshipData.fuelReserve <= 0) {
+  // === ОБРАБОТКА ВРЕМЕНИ И ПАУЗЫ (работает всегда) ===
+  const now = performance.now();
+  const dtReal = (now - airshipData.lastSimulateTime) / 1000; // секунды
+  airshipData.lastSimulateTime = now;
+
+  if (!isPaused) {
+    const dtSimulated = dtReal * timeWarpFactor;
+    airshipData.virtualTimeSeconds += dtSimulated;
+  }
+
+  // === ОСТАЛЬНАЯ ЛОГИКА — только если дирижабль запущен ===
+  if (!airshipMarker) return;
+
+  // === ЯКОРЬ ===
+  if (airshipData.anchorEnabled) {
     airshipData.throttle = 0;
     airshipData.enginePower = 0;
     airshipData.speed = 0;
     airshipData.groundSpeed = 0;
+    airshipData.autopilotEnabled = false;
+    airshipData.fastBrakeEnabled = false;
+    document.getElementById("fastBrakeToggle").checked = false;
+    document.getElementById("throttleSlider").value = 0;
+    throttleSlider.dispatchEvent(new Event("input"));
   }
 
-  if (!airshipMarker || isPaused) return;
+  // === АВТОПИЛОТ ===
+  if (airshipData.autopilotEnabled && !airshipData.anchorEnabled) {
+    runAutopilot();
+  }
 
-  const now = Date.now();
-  const dtReal = (now - airshipData.lastUpdate) / 1000;
-  const dtSimulated = dtReal * timeWarpFactor;
-  airshipData.virtualElapsedSeconds += dtSimulated;
-  airshipData.lastUpdate = now;
-
-  // === АВТОМАТИЧЕСКИЙ ВЕТЕР (каждую минуту виртуального времени) ===
+  // === АВТОМАТИЧЕСКИЙ ВЕТЕР ===
   if (windMode === "auto") {
-    const virtualTime = airshipData.virtualElapsedSeconds;
-    if (virtualTime - (airshipData.windLastVirtualUpdate || 0) >= 60) {
-      console.log("!!!");
-      // каждые 60 сек
+    if (
+      airshipData.virtualTimeSeconds -
+        (airshipData.windLastVirtualUpdate || 0) >=
+      60
+    ) {
       let changed = false;
-
-      // 1% шанс резкой смены направления
       if (Math.random() < 0.1) {
         windDirection = Math.floor(Math.random() * 360);
         changed = true;
       }
-
-      // 1% шанс резкой смены силы (с распределением: слабый — чаще)
       if (Math.random() < 0.1) {
-        // Распределение: веса для каждого уровня ветра (0–12)
-        const windWeights = [
-          10, // 0 — штиль
-          9, // 1
-          8, // 2
-          7, // 3
-          6, // 4
-          5, // 5
-          4, // 6
-          3, // 7
-          2, // 8
-          1.5, // 9
-          1, // 10
-          0.5, // 11
-          0.2, // 12 — ураган
-        ];
-
-        // Вычисляем кумулятивную сумму весов
+        const windWeights = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1.5, 1, 0.5, 0.2];
         const totalWeight = windWeights.reduce((a, b) => a + b, 0);
         let rand = Math.random() * totalWeight;
         let bf = 0;
@@ -637,206 +631,203 @@ function simulateStep() {
           }
           rand -= windWeights[i];
         }
-
         windSpeedBf = bf;
         changed = true;
       }
-
-      // Если не было резкого изменения — плавное
       if (!changed) {
-        windSpeedBf += (Math.random() - 0.5) * 0.3; // ±0.15 балла
-        windDirection += (Math.random() - 0.5) * 8; // ±4 градуса
+        windSpeedBf += (Math.random() - 0.5) * 0.3;
+        windDirection += (Math.random() - 0.5) * 8;
       }
-
-      // Ограничения
       windSpeedBf = Math.max(0, Math.min(12, windSpeedBf));
       windDirection = ((windDirection % 360) + 360) % 360;
-
-      // Сохраняем время последнего обновления
-      airshipData.windLastVirtualUpdate = virtualTime;
-
-      // Обновляем компас ветра (если есть)
-      if (typeof updateWindCompass === "function") {
-        updateWindCompass();
-      }
+      airshipData.windLastVirtualUpdate = airshipData.virtualTimeSeconds;
+      updateWindCompass();
     }
   }
 
-  if (airshipData.fastBrakeEnabled && airshipData.speed > 5) {
-    airshipData.throttle = -5;
-  } else if (airshipData.speed <= 5 && airshipData.fastBrakeEnabled) {
+  // === ЗАПРЕТ ДВИГАТЕЛЯ БЕЗ ТОПЛИВА ===
+  if (airshipData.fuelReserve <= 0) {
+    airshipData.throttle = 0;
+    airshipData.enginePower = 0;
+    airshipData.speed = 0;
+    airshipData.groundSpeed = 0;
+  }
+
+  // === АВТОМАТИЧЕСКОЕ ОТКЛЮЧЕНИЕ БЫСТРОГО ТОРМОЖЕНИЯ ===
+  if (airshipData.fastBrakeEnabled && Math.abs(airshipData.speed) <= 5) {
     airshipData.fastBrakeEnabled = false;
     document.getElementById("fastBrakeToggle").checked = false;
-    airshipData.throttle = 0;
+    document.getElementById("throttleSlider").value = 0;
+    throttleSlider.dispatchEvent(new Event("input"));
   }
 
-  if (airshipData.autopilotEnabled) {
-    runAutopilot();
-  }
+  // === ФИЗИКА ДВИЖЕНИЯ (только если не на якоре) ===
+  if (!airshipData.anchorEnabled) {
+    const currentSign = Math.sign(airshipData.enginePower);
+    const targetSign = Math.sign(airshipData.throttle);
 
-  const currentSign = Math.sign(airshipData.enginePower);
-  const targetSign = Math.sign(airshipData.throttle);
-
-  if (currentSign !== targetSign && airshipData.enginePower !== 0) {
-    if (airshipData.enginePower > 0) {
-      airshipData.enginePower = Math.max(
-        0,
-        airshipData.enginePower - ENGINE_POWER_RATE * dtSimulated,
-      );
+    if (currentSign !== targetSign && airshipData.enginePower !== 0) {
+      if (airshipData.enginePower > 0) {
+        airshipData.enginePower = Math.max(
+          0,
+          airshipData.enginePower - ENGINE_POWER_RATE * dtReal * timeWarpFactor,
+        );
+      } else {
+        airshipData.enginePower = Math.min(
+          0,
+          airshipData.enginePower + ENGINE_POWER_RATE * dtReal * timeWarpFactor,
+        );
+      }
+      if (Math.abs(airshipData.enginePower) <= 0.1) {
+        airshipData.enginePower = 0;
+      }
     } else {
-      airshipData.enginePower = Math.min(
-        0,
-        airshipData.enginePower + ENGINE_POWER_RATE * dtSimulated,
-      );
+      const targetEnginePower = airshipData.throttle * 20;
+      if (airshipData.enginePower < targetEnginePower) {
+        airshipData.enginePower = Math.min(
+          targetEnginePower,
+          airshipData.enginePower + ENGINE_POWER_RATE * dtReal * timeWarpFactor,
+        );
+      } else if (airshipData.enginePower > targetEnginePower) {
+        airshipData.enginePower = Math.max(
+          targetEnginePower,
+          airshipData.enginePower - ENGINE_POWER_RATE * dtReal * timeWarpFactor,
+        );
+      }
     }
-    if (Math.abs(airshipData.enginePower) <= 0.1) {
-      airshipData.enginePower = 0;
-    }
-  } else {
-    const targetEnginePower = airshipData.throttle * 20;
-    if (airshipData.enginePower < targetEnginePower) {
-      airshipData.enginePower = Math.min(
-        targetEnginePower,
-        airshipData.enginePower + ENGINE_POWER_RATE * dtSimulated,
-      );
-    } else if (airshipData.enginePower > targetEnginePower) {
-      airshipData.enginePower = Math.max(
-        targetEnginePower,
-        airshipData.enginePower - ENGINE_POWER_RATE * dtSimulated,
-      );
-    }
-  }
 
-  let fuelUsed = 0;
-  if (
-    airshipData.throttle !== 0 &&
-    airshipData.enginePower !== 0 &&
-    airshipData.fuelReserve > 0
-  ) {
-    const powerPercent = Math.abs(airshipData.enginePower);
-    const { fuelRate } = interpolateFuelAndSpeed(powerPercent);
-    const fuelRatePerSec = fuelRate / 3600;
-    fuelUsed = fuelRatePerSec * dtSimulated;
-    if (airshipData.fuelReserve >= fuelUsed) {
-      airshipData.fuelReserve -= fuelUsed;
-      airshipData.totalFuelBurned += fuelUsed;
-    } else {
-      airshipData.fuelReserve = 0;
-      airshipData.throttle = 0;
-      airshipData.enginePower = 0;
-    }
-  }
-
-  const { speed: targetSpeed } = interpolateFuelAndSpeed(
-    Math.abs(airshipData.enginePower),
-  );
-  const sign = Math.sign(airshipData.enginePower);
-  let finalTargetSpeed = sign * targetSpeed;
-
-  if (Math.abs(airshipData.speed - finalTargetSpeed) > 0.01) {
-    let acceleration = 0.08;
-    if (Math.abs(airshipData.enginePower) < 0.1) {
-      acceleration = 0.3;
-    } else if (
-      (airshipData.enginePower < 0 && airshipData.speed > 0) ||
-      (airshipData.enginePower > 0 && airshipData.speed < 0)
+    let fuelUsed = 0;
+    if (
+      airshipData.throttle !== 0 &&
+      airshipData.enginePower !== 0 &&
+      airshipData.fuelReserve > 0
     ) {
-      acceleration = 0.8;
+      const powerPercent = Math.abs(airshipData.enginePower);
+      const { fuelRate } = interpolateFuelAndSpeed(powerPercent);
+      const fuelRatePerSec = fuelRate / 3600;
+      fuelUsed = fuelRatePerSec * dtReal * timeWarpFactor;
+      if (airshipData.fuelReserve >= fuelUsed) {
+        airshipData.fuelReserve -= fuelUsed;
+        airshipData.totalFuelBurned += fuelUsed;
+      } else {
+        airshipData.fuelReserve = 0;
+        airshipData.throttle = 0;
+        airshipData.enginePower = 0;
+      }
     }
 
-    if (airshipData.speed < finalTargetSpeed) {
-      airshipData.speed = Math.min(
-        finalTargetSpeed,
-        airshipData.speed + acceleration * dtSimulated,
-      );
+    const { speed: targetSpeed } = interpolateFuelAndSpeed(
+      Math.abs(airshipData.enginePower),
+    );
+    const sign = Math.sign(airshipData.enginePower);
+    let finalTargetSpeed = sign * targetSpeed;
+
+    if (Math.abs(airshipData.speed - finalTargetSpeed) > 0.01) {
+      let acceleration = 0.08;
+      if (Math.abs(airshipData.enginePower) < 0.1) {
+        acceleration = 0.3;
+      } else if (
+        (airshipData.enginePower < 0 && airshipData.speed > 0) ||
+        (airshipData.enginePower > 0 && airshipData.speed < 0)
+      ) {
+        acceleration = 0.8;
+      }
+
+      if (airshipData.speed < finalTargetSpeed) {
+        airshipData.speed = Math.min(
+          finalTargetSpeed,
+          airshipData.speed + acceleration * dtReal * timeWarpFactor,
+        );
+      } else {
+        airshipData.speed = Math.max(
+          finalTargetSpeed,
+          airshipData.speed - acceleration * dtReal * timeWarpFactor,
+        );
+      }
     } else {
-      airshipData.speed = Math.max(
-        finalTargetSpeed,
-        airshipData.speed - acceleration * dtSimulated,
-      );
+      airshipData.speed = finalTargetSpeed;
     }
-  } else {
-    airshipData.speed = finalTargetSpeed;
-  }
 
-  if (
-    Math.abs(airshipData.enginePower) < 0.1 &&
-    Math.abs(airshipData.speed) > 0.1
-  ) {
-    const drag = 0.3 * dtSimulated;
-    if (airshipData.speed > 0) {
-      airshipData.speed = Math.max(0, airshipData.speed - drag);
+    if (
+      Math.abs(airshipData.enginePower) < 0.1 &&
+      Math.abs(airshipData.speed) > 0.1
+    ) {
+      const drag = 0.3 * dtReal * timeWarpFactor;
+      if (airshipData.speed > 0) {
+        airshipData.speed = Math.max(0, airshipData.speed - drag);
+      } else {
+        airshipData.speed = Math.min(0, airshipData.speed + drag);
+      }
+    }
+
+    if (Math.abs(airshipData.speed) > 0.1) {
+      const turnRate =
+        MIN_TURN_RATE +
+        (Math.abs(airshipData.speed) / 135) * (MAX_TURN_RATE - MIN_TURN_RATE);
+      const targetAngularVelocity = airshipData.rudder * turnRate;
+      const angularAccel = 0.5;
+      if (airshipData.angularVelocity < targetAngularVelocity) {
+        airshipData.angularVelocity = Math.min(
+          targetAngularVelocity,
+          airshipData.angularVelocity + angularAccel * dtReal * timeWarpFactor,
+        );
+      } else if (airshipData.angularVelocity > targetAngularVelocity) {
+        airshipData.angularVelocity = Math.max(
+          targetAngularVelocity,
+          airshipData.angularVelocity - angularAccel * dtReal * timeWarpFactor,
+        );
+      }
+      airshipData.heading +=
+        airshipData.angularVelocity * dtReal * timeWarpFactor;
+      airshipData.heading = ((airshipData.heading % 360) + 360) % 360;
     } else {
-      airshipData.speed = Math.min(0, airshipData.speed + drag);
+      airshipData.angularVelocity *= 0.95;
+      if (Math.abs(airshipData.angularVelocity) < 0.01)
+        airshipData.angularVelocity = 0;
     }
-  }
 
-  if (Math.abs(airshipData.speed) > 0.1) {
-    const turnRate =
-      MIN_TURN_RATE +
-      (Math.abs(airshipData.speed) / 135) * (MAX_TURN_RATE - MIN_TURN_RATE);
-    const targetAngularVelocity = airshipData.rudder * turnRate;
-    const angularAccel = 0.5;
-    if (airshipData.angularVelocity < targetAngularVelocity) {
-      airshipData.angularVelocity = Math.min(
-        targetAngularVelocity,
-        airshipData.angularVelocity + angularAccel * dtSimulated,
-      );
-    } else if (airshipData.angularVelocity > targetAngularVelocity) {
-      airshipData.angularVelocity = Math.max(
-        targetAngularVelocity,
-        airshipData.angularVelocity - angularAccel * dtSimulated,
-      );
+    const rpm = calculatePropellerRPM();
+    if (rpm !== 0) {
+      const rotationPerSecond = (Math.abs(rpm) * 360) / 60;
+      airshipData.propRotationAngle +=
+        rotationPerSecond * dtReal * timeWarpFactor * Math.sign(rpm);
+      airshipData.propRotationAngle %= 360;
     }
-    airshipData.heading += airshipData.angularVelocity * dtSimulated;
-    airshipData.heading = ((airshipData.heading % 360) + 360) % 360;
-  } else {
-    airshipData.angularVelocity *= 0.95;
-    if (Math.abs(airshipData.angularVelocity) < 0.01)
-      airshipData.angularVelocity = 0;
-  }
 
-  const rpm = calculatePropellerRPM();
-  if (rpm !== 0) {
-    const rotationPerSecond = (Math.abs(rpm) * 360) / 60;
-    airshipData.propRotationAngle +=
-      rotationPerSecond * dtSimulated * Math.sign(rpm);
-    airshipData.propRotationAngle %= 360;
-  }
+    applyWindEffect(dtReal * timeWarpFactor);
+    const distanceKm =
+      (Math.abs(airshipData.groundSpeed) * dtReal * timeWarpFactor) / 3600;
+    const distanceMeters = distanceKm * 1000;
+    airshipData.totalDistanceMeters += distanceMeters;
 
-  applyWindEffect(dtSimulated);
-  const distanceKm = (Math.abs(airshipData.groundSpeed) * dtSimulated) / 3600;
-  const distanceMeters = distanceKm * 1000;
-  airshipData.totalDistanceMeters += distanceMeters;
+    const headingRad = (airshipData.heading * Math.PI) / 180;
+    const dx =
+      distanceMeters * Math.sin(headingRad) * Math.sign(airshipData.speed);
+    const dy =
+      distanceMeters * Math.cos(headingRad) * Math.sign(airshipData.speed);
+    const earthRadius = 6378137;
+    const newLat = airshipData.lat + (dy / earthRadius) * (180 / Math.PI);
+    const newLng =
+      airshipData.lng +
+      ((dx / earthRadius) * (180 / Math.PI)) /
+        Math.cos((airshipData.lat * Math.PI) / 180);
+    airshipData.lat = newLat;
+    airshipData.lng = newLng;
+    airshipMarker.setLatLng([newLat, newLng]);
+    if (flagMarker) flagMarker.setLatLng([newLat, newLng]);
 
-  const headingRad = (airshipData.heading * Math.PI) / 180;
-  const dx =
-    distanceMeters * Math.sin(headingRad) * Math.sign(airshipData.speed);
-  const dy =
-    distanceMeters * Math.cos(headingRad) * Math.sign(airshipData.speed);
-  const earthRadius = 6378137;
-  const newLat = airshipData.lat + (dy / earthRadius) * (180 / Math.PI);
-  const newLng =
-    airshipData.lng +
-    ((dx / earthRadius) * (180 / Math.PI)) /
-      Math.cos((airshipData.lat * Math.PI) / 180);
-  airshipData.lat = newLat;
-  airshipData.lng = newLng;
-  airshipMarker.setLatLng([newLat, newLng]);
-  if (flagMarker) flagMarker.setLatLng([newLat, newLng]);
+    if (airshipData.followEnabled) {
+      map.panTo([newLat, newLng], { animate: false });
+    }
 
-  if (airshipData.followEnabled) {
-    map.panTo([newLat, newLng], { animate: false });
-  }
-
-  if (airshipData.hasTarget) {
-    updateDirectionArrow();
+    if (airshipData.hasTarget) {
+      updateDirectionArrow();
+    }
   }
 
   updateDisplays();
   updateAirshipIcon();
   updateStats();
-  updateWindCompass();
 }
 
 // === ЗАПУСК И УПРАВЛЕНИЕ ===
@@ -874,23 +865,24 @@ function spawnAirship(lat, lng) {
     throttle: 0,
     rudder: 0,
     angularVelocity: 0,
-    lastUpdate: Date.now(),
     propRotationAngle: 0,
     flagEnabled: false,
     followEnabled: false,
     autopilotEnabled: false,
     fastBrakeEnabled: false,
-    startTime: Date.now(),
+    anchorEnabled: true,
     totalDistanceMeters: 0,
-    fuelReserve: 0,
+    fuelReserve: 100,
     totalFuelBurned: 0,
     hasTarget: false,
     targetLat: null,
     targetLng: null,
-    virtualStartTime: Date.now(),
     enginePower: 0,
     groundSpeed: 0,
     windLastVirtualUpdate: 0,
+    virtualTimeSeconds: 0,
+    virtualStartDate: new Date(),
+    lastSimulateTime: performance.now(),
   });
 
   document.getElementById("controls").style.display = "flex";
@@ -913,7 +905,7 @@ function startAutoSave() {
     if (airshipMarker) {
       localStorage.setItem("airshipState", JSON.stringify(airshipData));
     }
-  }, 1000);
+  }, 15000);
 }
 
 // === ЗАГРУЗКА ===
@@ -967,10 +959,8 @@ function loadFromUrl() {
     airshipData.autopilotEnabled = safeBool("apl");
     airshipData.fastBrakeEnabled = safeBool("fbr");
 
-    const vst = safeInt("vst", 0);
-    airshipData.virtualStartTime = vst > 0 ? vst * 1000 : Date.now();
-    airshipData.startTime = Date.now();
-    airshipData.lastUpdate = Date.now();
+    airshipData.virtualStartDate = new Date();
+    airshipData.lastSimulateTime = performance.now();
 
     if (airshipMarker) map.removeLayer(airshipMarker);
     airshipMarker = L.marker([lat, lng], {
@@ -1014,7 +1004,8 @@ function loadSavedState() {
             document.getElementById("start-menu").style.display = "none";
             spawnAirship(parsed.lat, parsed.lng);
             Object.assign(airshipData, parsed);
-            airshipData.startTime = Date.now();
+            airshipData.virtualStartDate = new Date();
+            airshipData.lastSimulateTime = performance.now();
             gameStarted = true;
             awaitingSpawn = false;
 
@@ -1035,9 +1026,6 @@ function loadSavedState() {
             if (airshipData.hasTarget) {
               setTarget(airshipData.targetLat, airshipData.targetLng);
             }
-
-            document.getElementById("anchorToggle").checked =
-              airshipData.anchorEnabled;
             focusOnAirship(12);
             updateWindCompass();
             startAutoSave();
@@ -1089,6 +1077,7 @@ const rudderValue = document.getElementById("rudderValue");
 const throttleValue = document.getElementById("throttleValue");
 
 rudderSlider.addEventListener("input", () => {
+  if (airshipData.anchorEnabled) return;
   airshipData.autopilotEnabled = false;
   document.getElementById("autopilotToggle").checked = false;
   const sliderVal = parseInt(rudderSlider.value);
@@ -1097,17 +1086,15 @@ rudderSlider.addEventListener("input", () => {
 });
 
 throttleSlider.addEventListener("input", () => {
-  // 🔥 Проверка: нельзя включить двигатель без топлива
+  if (airshipData.anchorEnabled) return;
   if (airshipData.fuelReserve <= 0 && parseInt(throttleSlider.value) !== 0) {
     throttleSlider.value = 0;
     alert("Невозможно запустить двигатель: нет топлива!");
     return;
   }
-
   airshipData.autopilotEnabled = false;
   document.getElementById("autopilotToggle").checked = false;
   airshipData.throttle = parseInt(throttleSlider.value);
-
   const throttleLabels = {
     "-5": "ASTERN FULL",
     "-4": "ASTERN HALF",
@@ -1127,10 +1114,21 @@ throttleSlider.addEventListener("input", () => {
 document
   .getElementById("fastBrakeToggle")
   .addEventListener("change", function () {
-    airshipData.fastBrakeEnabled = this.checked;
-    if (airshipData.fastBrakeEnabled && airshipData.speed <= 5) {
+    if (airshipData.anchorEnabled) {
       this.checked = false;
-      airshipData.fastBrakeEnabled = false;
+      return;
+    }
+
+    airshipData.fastBrakeEnabled = this.checked;
+
+    if (airshipData.fastBrakeEnabled) {
+      // Включаем реверс через слайдер
+      document.getElementById("throttleSlider").value = -5;
+      throttleSlider.dispatchEvent(new Event("input"));
+    } else {
+      // Возвращаем в нейтраль
+      document.getElementById("throttleSlider").value = 0;
+      throttleSlider.dispatchEvent(new Event("input"));
     }
   });
 
@@ -1146,6 +1144,11 @@ document.getElementById("followToggle").addEventListener("change", function () {
 document
   .getElementById("autopilotToggle")
   .addEventListener("change", function () {
+    if (airshipData.anchorEnabled) {
+      this.checked = false;
+      alert("Нельзя включить автопилот: дирижабль на якоре.");
+      return;
+    }
     airshipData.autopilotEnabled = this.checked;
     if (airshipData.autopilotEnabled && !airshipData.hasTarget) {
       this.checked = false;
@@ -1154,7 +1157,20 @@ document
     }
   });
 
-// Ветер
+document.getElementById("anchorToggle").addEventListener("change", function () {
+  if (this.checked) {
+    if (Math.abs(airshipData.groundSpeed) > 15) {
+      this.checked = false;
+      alert("Нельзя бросить якорь на скорости выше 15 км/ч!");
+      return;
+    }
+    airshipData.anchorEnabled = true;
+  } else {
+    airshipData.anchorEnabled = false;
+  }
+  updateDisplays();
+});
+
 document.querySelectorAll('input[name="windMode"]').forEach((radio) => {
   radio.addEventListener("change", () => {
     windMode = radio.value;
@@ -1177,10 +1193,9 @@ windDirectionSlider.addEventListener("input", () => {
   updateWindCompass();
 });
 
-// Кнопка "Случайный ветер"
 document.getElementById("randomWindBtn").addEventListener("click", () => {
-  windSpeedBf += (Math.random() - 0.5) * 0.6; // ±0.3 балла
-  windDirection += (Math.random() - 0.5) * 15; // ±7.5 градусов
+  windSpeedBf += (Math.random() - 0.5) * 0.6;
+  windDirection += (Math.random() - 0.5) * 15;
   windSpeedBf = Math.max(0, Math.min(12, windSpeedBf));
   windDirection = ((windDirection % 360) + 360) % 360;
   document.getElementById("windSpeedSelect").value = Math.round(windSpeedBf);
@@ -1189,7 +1204,6 @@ document.getElementById("randomWindBtn").addEventListener("click", () => {
   updateWindCompass();
 });
 
-// Кнопки
 document.getElementById("focusBtn").addEventListener("click", () => {
   focusOnAirship(12);
 });
@@ -1222,22 +1236,6 @@ document.getElementById("toggleControlsBtn").addEventListener("click", () => {
     controls.style.display = "none";
     btn.textContent = "⌄";
   }
-});
-
-document.getElementById("anchorToggle").addEventListener("change", function () {
-  if (this.checked) {
-    // Пытаемся поставить якорь
-    if (Math.abs(airshipData.groundSpeed) > 5) {
-      this.checked = false; // отменяем
-      alert("Нельзя бросить якорь на скорости выше 5 км/ч!");
-      return;
-    }
-    airshipData.anchorEnabled = true;
-  } else {
-    // Снимаем с якоря — разрешено всегда
-    airshipData.anchorEnabled = false;
-  }
-  updateDisplays(); // обновляем блокировку элементов
 });
 
 map.on("click", (e) => {
