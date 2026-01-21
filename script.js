@@ -447,7 +447,8 @@ function updateWindCompass() {
   const arrowY = centerY + arrowLength * Math.sin(arrowRad);
 
   const windSpeedKmh = beaufortToMps(windSpeedBf) * 3.6;
-  const windSpeedText = (windSpeedBf = `(${windSpeedKmh.toFixed(0)} км/ч)`);
+  const windSpeedText =
+    windSpeedBf === 0 ? "(Штиль)" : `(${windSpeedKmh.toFixed(0)} км/ч)`;
 
   const compassSvg = `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
