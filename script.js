@@ -67,11 +67,12 @@ let airshipData = {
   targetLng: null,
   enginePower: 0,
   groundSpeed: 0,
+  groundTrack: 0,
   windLastVirtualUpdate: 0,
   virtualTimeSeconds: 0,
   virtualStartDate: new Date(),
   lastSimulateTime: performance.now(),
-  autopilotIsControlling: false, // ← ключевое поле для стабильности
+  autopilotIsControlling: false,
 };
 
 // === ИКОНКИ ===
@@ -385,12 +386,6 @@ function updateDisplays() {
   rudderValue.textContent = airshipData.rudder.toFixed(1) + "°";
   throttleValue.textContent = throttleLabels[airshipData.throttle] || "STOP";
 
-  const speedDisplay =
-    airshipData.groundSpeed >= 0
-      ? airshipData.groundSpeed.toFixed(1) + " км/ч"
-      : "← " + Math.abs(airshipData.groundSpeed).toFixed(1) + " км/ч";
-  document.getElementById("speedometer").textContent = speedDisplay;
-
   const sign = airshipData.enginePower >= 0 ? "" : "-";
   document.getElementById("enginePowerDisplay").textContent =
     sign + Math.abs(Math.round(airshipData.enginePower)) + "%";
@@ -435,38 +430,86 @@ function updateDisplays() {
   document.getElementById("anchorToggle").checked = airshipData.anchorEnabled;
 }
 
-// === КОМПАС ВЕТРА ===
+// === КОМПАС ВЕТРА С НАПРАВЛЕНИЕМ ДВИЖЕНИЯ ===
 
 function updateWindCompass() {
-  const size = 120;
+  const size = 140;
   const centerX = size / 2;
   const centerY = size / 2;
-  const arrowLength = size * 0.35;
-  const arrowRad = ((windDirection - 90) * Math.PI) / 180;
-  const arrowX = centerX + arrowLength * Math.cos(arrowRad);
-  const arrowY = centerY + arrowLength * Math.sin(arrowRad);
+  const radius = size * 0.35;
+
+  // Ветер
+  const windRad = ((windDirection - 90) * Math.PI) / 180;
+  const windX = centerX + radius * Math.cos(windRad);
+  const windY = centerY + radius * Math.sin(windRad);
+
+  // Направление движения по земле
+  const trackRad = ((airshipData.groundTrack - 90) * Math.PI) / 180;
+  const trackX = centerX + radius * Math.cos(trackRad);
+  const trackY = centerY + radius * Math.sin(trackRad);
 
   const windSpeedKmh = beaufortToMps(windSpeedBf) * 3.6;
   const windSpeedText =
     windSpeedBf === 0 ? "(Штиль)" : `(${windSpeedKmh.toFixed(0)} км/ч)`;
 
+  const shipSpeedText = `${Math.abs(airshipData.groundSpeed).toFixed(0)} км/ч`;
+
   const compassSvg = `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
       <circle cx="${centerX}" cy="${centerY}" r="${size / 2}" fill="#000" stroke="#ccc" stroke-width="2"/>
-      <line x1="${centerX}" y1="${centerY}" x2="${arrowX}" y2="${arrowY}" stroke="#ff0" stroke-width="3" marker-end="url(#arrowhead-wind)"/>
-      <text x="${centerX}" y="16" text-anchor="middle" fill="#fff" font-size="12" font-family="Arial">N</text>
-      <text x="${size - 8}" y="${centerY + 6}" text-anchor="end" fill="#fff" font-size="12" font-family="Arial">E</text>
-      <text x="${centerX}" y="${size - 4}" text-anchor="middle" fill="#fff" font-size="12" font-family="Arial">S</text>
-      <text x="8" y="${centerY + 6}" text-anchor="start" fill="#fff" font-size="12" font-family="Arial">W</text>
-      <text x="${centerX}" y="${centerY + 30}" text-anchor="middle" fill="#ff0" font-size="10" font-family="Arial">${windSpeedText}</text>
+      <line x1="${centerX}" y1="${centerY}" x2="${windX}" y2="${windY}" stroke="#ff0" stroke-width="3" marker-end="url(#arrow-wind)"/>
+      <line x1="${centerX}" y1="${centerY}" x2="${trackX}" y2="${trackY}" stroke="#0ff" stroke-width="3" marker-end="url(#arrow-track)"/>
+      <text x="${centerX}" y="18" text-anchor="middle" fill="#fff" font-size="12" font-family="Arial">N</text>
+      <text x="${size - 10}" y="${centerY + 6}" text-anchor="end" fill="#fff" font-size="12" font-family="Arial">E</text>
+      <text x="${centerX}" y="${size - 2}" text-anchor="middle" fill="#fff" font-size="12" font-family="Arial">S</text>
+      <text x="10" y="${centerY + 6}" text-anchor="start" fill="#fff" font-size="12" font-family="Arial">W</text>
+      <text x="${centerX}" y="${centerY - 20}" text-anchor="middle" fill="#0ff" font-size="12" font-family="Arial">${shipSpeedText}</text>
+      <text x="${centerX}" y="${centerY + 40}" text-anchor="middle" fill="#ff0" font-size="10" font-family="Arial">${windSpeedText}</text>
     </svg>
     <defs>
-      <marker id="arrowhead-wind" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <marker id="arrow-wind" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
         <polygon points="0,0 8,3 0,6" fill="#ff0"/>
+      </marker>
+      <marker id="arrow-track" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0,0 8,3 0,6" fill="#0ff"/>
       </marker>
     </defs>`;
 
   document.getElementById("windCompass").innerHTML = compassSvg;
+}
+
+// === ОБНОВЛЕНИЕ СКОРОСТИ И НАПРАВЛЕНИЯ ПО ЗЕМЛЕ ===
+
+function updateGroundMotion() {
+  const windSpeedMs = beaufortToMps(windSpeedBf);
+  const windAngleRad = (windDirection * Math.PI) / 180;
+
+  // Воздушная скорость дирижабля
+  const shipSpeedMs = airshipData.speed / 3.6;
+  const shipAngleRad = (airshipData.heading * Math.PI) / 180;
+
+  // Компоненты: X = восток, Y = север
+  const shipEast = shipSpeedMs * Math.sin(shipAngleRad);
+  const shipNorth = shipSpeedMs * Math.cos(shipAngleRad);
+
+  const windEast = windSpeedMs * Math.sin(windAngleRad);
+  const windNorth = windSpeedMs * Math.cos(windAngleRad);
+
+  const totalEast = shipEast + windEast;
+  const totalNorth = shipNorth + windNorth;
+
+  // Скорость по земле — ВСЕГДА положительная
+  const groundSpeedMs = Math.sqrt(
+    totalEast * totalEast + totalNorth * totalNorth,
+  );
+  airshipData.groundSpeed = groundSpeedMs * 3.6; // ≥ 0
+
+  // Направление движения по земле (0° = север, 90° = восток, 180° = юг)
+  let trackDeg =
+    ((Math.atan2(totalEast, totalNorth) * 180) / Math.PI + 360) % 360;
+  airshipData.groundTrack = trackDeg;
+
+  // Убираем логику "движения назад" — она мешает отображению
 }
 
 // === ФИЗИКА И ВЕТЕР ===
@@ -483,23 +526,6 @@ function applyWindEffect(dt) {
   airshipData.lng +=
     ((driftX / earthRadius) * (180 / Math.PI)) /
     Math.cos((airshipData.lat * Math.PI) / 180);
-
-  const shipSpeedMs = airshipData.speed / 3.6;
-  const shipAngleRad = (airshipData.heading * Math.PI) / 180;
-  const shipX = shipSpeedMs * Math.sin(shipAngleRad);
-  const shipY = shipSpeedMs * Math.cos(shipAngleRad);
-
-  const totalX = shipX + windSpeedMs * Math.sin(windAngleRad);
-  const totalY = shipY + windSpeedMs * Math.cos(windAngleRad);
-
-  const groundSpeedMs = Math.sqrt(totalX * totalX + totalY * totalY);
-  const groundSpeedKmh = groundSpeedMs * 3.6;
-
-  const courseAngleRad = (airshipData.heading * Math.PI) / 180;
-  const dotProduct =
-    totalX * Math.sin(courseAngleRad) + totalY * Math.cos(courseAngleRad);
-
-  airshipData.groundSpeed = dotProduct >= 0 ? groundSpeedKmh : -groundSpeedKmh;
 }
 
 function runAutopilot() {
@@ -528,7 +554,6 @@ function runAutopilot() {
   const dy = R * (Math.sin(lat2) - Math.sin(lat1));
   const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
 
-  // === ФАЗА 1: ПОЛЁТ (> 1 км) ===
   if (distanceToTarget > 1000) {
     let headingError = bearingToTarget - airshipData.heading;
     if (headingError > 180) headingError -= 360;
@@ -545,17 +570,13 @@ function runAutopilot() {
     document.getElementById("throttleSlider").value = 5;
     throttleSlider.dispatchEvent(new Event("input"));
     airshipData.autopilotIsControlling = false;
-  }
-  // === ФАЗА 2: ТОРМОЖЕНИЕ (≤ 1 км, скорость > 15) ===
-  else if (Math.abs(airshipData.groundSpeed) > 15) {
+  } else if (Math.abs(airshipData.groundSpeed) > 15) {
     airshipData.autopilotIsControlling = true;
     document.getElementById("rudderSlider").value = 0;
     document.getElementById("throttleSlider").value = -5;
     throttleSlider.dispatchEvent(new Event("input"));
     airshipData.autopilotIsControlling = false;
-  }
-  // === ФАЗА 3: ОСТАНОВКА И ЯКОРЬ (≤ 15 км/ч) ===
-  else {
+  } else {
     airshipData.autopilotIsControlling = true;
     document.getElementById("throttleSlider").value = 0;
     throttleSlider.dispatchEvent(new Event("input"));
@@ -574,7 +595,6 @@ function runAutopilot() {
 // === ОСНОВНОЙ ЦИКЛ ===
 
 function simulateStep() {
-  // === ВРЕМЯ И ПАУЗА (работает всегда) ===
   const now = performance.now();
   const dtReal = (now - airshipData.lastSimulateTime) / 1000;
   airshipData.lastSimulateTime = now;
@@ -586,12 +606,12 @@ function simulateStep() {
 
   if (!airshipMarker) return;
 
-  // === ЯКОРЬ ===
   if (airshipData.anchorEnabled) {
     airshipData.throttle = 0;
     airshipData.enginePower = 0;
     airshipData.speed = 0;
     airshipData.groundSpeed = 0;
+    airshipData.groundTrack = airshipData.heading;
     airshipData.autopilotEnabled = false;
     airshipData.fastBrakeEnabled = false;
     document.getElementById("fastBrakeToggle").checked = false;
@@ -599,12 +619,10 @@ function simulateStep() {
     throttleSlider.dispatchEvent(new Event("input"));
   }
 
-  // === АВТОПИЛОТ ===
   if (airshipData.autopilotEnabled && !airshipData.anchorEnabled) {
     runAutopilot();
   }
 
-  // === АВТОМАТИЧЕСКИЙ ВЕТЕР ===
   if (windMode === "auto") {
     if (
       airshipData.virtualTimeSeconds -
@@ -638,19 +656,17 @@ function simulateStep() {
       windSpeedBf = Math.max(0, Math.min(12, windSpeedBf));
       windDirection = ((windDirection % 360) + 360) % 360;
       airshipData.windLastVirtualUpdate = airshipData.virtualTimeSeconds;
-      updateWindCompass();
     }
   }
 
-  // === ЗАПРЕТ ДВИГАТЕЛЯ БЕЗ ТОПЛИВА ===
   if (airshipData.fuelReserve <= 0) {
     airshipData.throttle = 0;
     airshipData.enginePower = 0;
     airshipData.speed = 0;
     airshipData.groundSpeed = 0;
+    airshipData.groundTrack = airshipData.heading;
   }
 
-  // === АВТОМАТИЧЕСКОЕ ОТКЛЮЧЕНИЕ БЫСТРОГО ТОРМОЖЕНИЯ ===
   if (airshipData.fastBrakeEnabled && Math.abs(airshipData.speed) <= 5) {
     airshipData.fastBrakeEnabled = false;
     document.getElementById("fastBrakeToggle").checked = false;
@@ -658,7 +674,7 @@ function simulateStep() {
     throttleSlider.dispatchEvent(new Event("input"));
   }
 
-  // === ФИЗИКА ДВИЖЕНИЯ ===
+  // === ОБНОВЛЕНИЕ ДВИЖЕНИЯ ===
   if (!airshipData.anchorEnabled) {
     const currentSign = Math.sign(airshipData.enginePower);
     const targetSign = Math.sign(airshipData.throttle);
@@ -792,9 +808,9 @@ function simulateStep() {
     }
 
     applyWindEffect(dtReal * timeWarpFactor);
-    const distanceKm =
-      (Math.abs(airshipData.groundSpeed) * dtReal * timeWarpFactor) / 3600;
-    const distanceMeters = distanceKm * 1000;
+
+    const distanceMeters =
+      (airshipData.groundSpeed * (dtReal * timeWarpFactor)) / 3.6;
     airshipData.totalDistanceMeters += distanceMeters;
 
     const headingRad = (airshipData.heading * Math.PI) / 180;
@@ -822,9 +838,13 @@ function simulateStep() {
     }
   }
 
+  // === КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: обновляем ground motion КАЖДЫЙ КАДР ===
+  updateGroundMotion();
+
   updateDisplays();
   updateAirshipIcon();
   updateStats();
+  updateWindCompass();
 }
 
 // === ЗАПУСК И УПРАВЛЕНИЕ ===
@@ -876,6 +896,7 @@ function spawnAirship(lat, lng) {
     targetLng: null,
     enginePower: 0,
     groundSpeed: 0,
+    groundTrack: 0,
     windLastVirtualUpdate: 0,
     virtualTimeSeconds: 0,
     virtualStartDate: new Date(),
@@ -1094,7 +1115,6 @@ throttleSlider.addEventListener("input", () => {
   const newThrottle = parseInt(throttleSlider.value);
   airshipData.throttle = newThrottle;
 
-  // Только если НЕ автопилот управляет
   if (!airshipData.autopilotIsControlling) {
     airshipData.autopilotEnabled = false;
     document.getElementById("autopilotToggle").checked = false;
