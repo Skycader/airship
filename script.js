@@ -133,7 +133,7 @@ function getAirshipSvg(zoom, heading, propRotationAngle) {
   const metersPerPixel =
     (156543.03392 * Math.cos((airshipData.lat * Math.PI) / 180)) /
     Math.pow(2, zoom);
-  const lengthPx = 500 / metersPerPixel;
+  const lengthPx = 245 / metersPerPixel;
   const widthPx = lengthPx * 0.22;
 
   const propSize = widthPx * 0.3;
@@ -426,6 +426,14 @@ function updateDisplays() {
     airshipData.autopilotEnabled;
   document.getElementById("fastBrakeToggle").checked =
     airshipData.fastBrakeEnabled;
+
+  // Блокировка управления при якоре
+  const isAnchored = airshipData.anchorEnabled;
+  document.getElementById("rudderSlider").disabled = isAnchored;
+  document.getElementById("throttleSlider").disabled = isAnchored;
+  document.getElementById("fastBrakeToggle").disabled = isAnchored;
+  document.getElementById("autopilotToggle").disabled =
+    isAnchored || !airshipData.hasTarget;
 }
 
 // === КОМПАС ВЕТРА ===
@@ -506,6 +514,17 @@ function runAutopilot() {
     !airshipData.hasTarget ||
     !airshipData.autopilotEnabled ||
     airshipData.fuelReserve <= 0
+  ) {
+    // Если нет топлива — выключаем автопилот
+    airshipData.throttle = 0;
+    document.getElementById("throttleSlider").value = 0;
+    return;
+  }
+
+  if (
+    !airshipData.hasTarget ||
+    !airshipData.autopilotEnabled ||
+    airshipData.fuelReserve <= 0
   )
     return;
 
@@ -557,6 +576,15 @@ function runAutopilot() {
 // === ОСНОВНОЙ ЦИКЛ ===
 
 function simulateStep() {
+  if (isPaused) return;
+  // 🔥 Если нет топлива — глушим двигатель
+  if (airshipData.fuelReserve <= 0) {
+    airshipData.throttle = 0;
+    airshipData.enginePower = 0;
+    airshipData.speed = 0;
+    airshipData.groundSpeed = 0;
+  }
+
   if (!airshipMarker || isPaused) return;
 
   const now = Date.now();
@@ -854,7 +882,7 @@ function spawnAirship(lat, lng) {
     fastBrakeEnabled: false,
     startTime: Date.now(),
     totalDistanceMeters: 0,
-    fuelReserve: 50000,
+    fuelReserve: 0,
     totalFuelBurned: 0,
     hasTarget: false,
     targetLat: null,
@@ -885,7 +913,7 @@ function startAutoSave() {
     if (airshipMarker) {
       localStorage.setItem("airshipState", JSON.stringify(airshipData));
     }
-  }, 10000);
+  }, 1000);
 }
 
 // === ЗАГРУЗКА ===
@@ -1007,6 +1035,9 @@ function loadSavedState() {
             if (airshipData.hasTarget) {
               setTarget(airshipData.targetLat, airshipData.targetLng);
             }
+
+            document.getElementById("anchorToggle").checked =
+              airshipData.anchorEnabled;
             focusOnAirship(12);
             updateWindCompass();
             startAutoSave();
@@ -1066,9 +1097,17 @@ rudderSlider.addEventListener("input", () => {
 });
 
 throttleSlider.addEventListener("input", () => {
+  // 🔥 Проверка: нельзя включить двигатель без топлива
+  if (airshipData.fuelReserve <= 0 && parseInt(throttleSlider.value) !== 0) {
+    throttleSlider.value = 0;
+    alert("Невозможно запустить двигатель: нет топлива!");
+    return;
+  }
+
   airshipData.autopilotEnabled = false;
   document.getElementById("autopilotToggle").checked = false;
   airshipData.throttle = parseInt(throttleSlider.value);
+
   const throttleLabels = {
     "-5": "ASTERN FULL",
     "-4": "ASTERN HALF",
@@ -1186,7 +1225,19 @@ document.getElementById("toggleControlsBtn").addEventListener("click", () => {
 });
 
 document.getElementById("anchorToggle").addEventListener("change", function () {
-  airshipData.anchorEnabled = this.checked;
+  if (this.checked) {
+    // Пытаемся поставить якорь
+    if (Math.abs(airshipData.groundSpeed) > 5) {
+      this.checked = false; // отменяем
+      alert("Нельзя бросить якорь на скорости выше 5 км/ч!");
+      return;
+    }
+    airshipData.anchorEnabled = true;
+  } else {
+    // Снимаем с якоря — разрешено всегда
+    airshipData.anchorEnabled = false;
+  }
+  updateDisplays(); // обновляем блокировку элементов
 });
 
 map.on("click", (e) => {
