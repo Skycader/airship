@@ -508,8 +508,6 @@ function updateGroundMotion() {
   let trackDeg =
     ((Math.atan2(totalEast, totalNorth) * 180) / Math.PI + 360) % 360;
   airshipData.groundTrack = trackDeg;
-
-  // Убираем логику "движения назад" — она мешает отображению
 }
 
 // === ФИЗИКА И ВЕТЕР ===
@@ -599,9 +597,17 @@ function simulateStep() {
   const dtReal = (now - airshipData.lastSimulateTime) / 1000;
   airshipData.lastSimulateTime = now;
 
+  // === ОБНОВЛЕНИЕ ВРЕМЕНИ ===
   if (!isPaused) {
     const dtSimulated = dtReal * timeWarpFactor;
     airshipData.virtualTimeSeconds += dtSimulated;
+  }
+
+  // === ЕСЛИ ПАУЗА — НИЧЕГО БОЛЬШЕ НЕ ДЕЛАТЬ ===
+  if (isPaused) {
+    updateDisplays();
+    updateWindCompass();
+    return;
   }
 
   if (!airshipMarker) return;
@@ -808,7 +814,6 @@ function simulateStep() {
     }
 
     applyWindEffect(dtReal * timeWarpFactor);
-
     const distanceMeters =
       (airshipData.groundSpeed * (dtReal * timeWarpFactor)) / 3.6;
     airshipData.totalDistanceMeters += distanceMeters;
@@ -838,7 +843,7 @@ function simulateStep() {
     }
   }
 
-  // === КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: обновляем ground motion КАЖДЫЙ КАДР ===
+  // === ОБНОВЛЕНИЕ ДВИЖЕНИЯ ПО ЗЕМЛЕ ===
   updateGroundMotion();
 
   updateDisplays();
