@@ -9,24 +9,24 @@ let airshipMarker = null;
 let flagMarker = null;
 let targetMarker = null;
 let directionArrow = null;
+MAX_FUEL_CAPACITY = 100 * 1000;
 
 const timeSteps = [0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 1000];
 let timeWarpFactor = 1;
 let isPaused = false;
 
-// === ТОПЛИВО (ДИЗЕЛЬ) ===
-const MAX_FUEL_CAPACITY = 88000; // литров
-const FUEL_CONSUMPTION_TABLE = [
-  [10, 85, 63],
-  [20, 170, 79],
-  [30, 254, 90],
-  [40, 339, 100],
-  [50, 424, 107],
-  [60, 508, 114],
-  [70, 593, 120],
-  [80, 678, 125],
-  [90, 762, 130],
-  [100, 847, 135],
+// === ДВИГАТЕЛИ DAIMLER-BENZ DB 602 (ОРИГИНАЛ "ГИНДЕНБУРГА") ===
+const ENGINE_PERFORMANCE_TABLE = [
+  { power: 10, rpm: 765, fuel: 26, airflowKmh: 84 },
+  { power: 20, rpm: 963, fuel: 53, airflowKmh: 105 },
+  { power: 30, rpm: 1103, fuel: 79, airflowKmh: 121 },
+  { power: 40, rpm: 1214, fuel: 106, airflowKmh: 133 },
+  { power: 50, rpm: 1308, fuel: 132, airflowKmh: 143 },
+  { power: 60, rpm: 1391, fuel: 158, airflowKmh: 152 },
+  { power: 70, rpm: 1464, fuel: 185, airflowKmh: 160 },
+  { power: 80, rpm: 1531, fuel: 211, airflowKmh: 167 },
+  { power: 90, rpm: 1592, fuel: 238, airflowKmh: 174 },
+  { power: 100, rpm: 1650, fuel: 264, airflowKmh: 180 },
 ];
 
 // === МАСШТАБ ===
@@ -92,22 +92,26 @@ const targetIcon = L.divIcon({
 
 // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
-function interpolateFuelAndSpeed(powerPercent) {
-  if (powerPercent <= 0) return { fuelRate: 0, speed: 0 };
-  if (powerPercent >= 100) return { fuelRate: 847, speed: 135 };
-  for (let i = 0; i < FUEL_CONSUMPTION_TABLE.length; i++) {
-    const [p, f, s] = FUEL_CONSUMPTION_TABLE[i];
-    if (powerPercent <= p) {
-      if (i === 0) return { fuelRate: f, speed: s };
-      const [p0, f0, s0] = FUEL_CONSUMPTION_TABLE[i - 1];
-      const t = (powerPercent - p0) / (p - p0);
+function getEngineData(powerPercent) {
+  if (powerPercent <= 0) return { rpm: 0, fuel: 0, airflowKmh: 0 };
+  if (powerPercent >= 100) return ENGINE_PERFORMANCE_TABLE[9];
+
+  for (let i = 0; i < ENGINE_PERFORMANCE_TABLE.length; i++) {
+    if (powerPercent <= ENGINE_PERFORMANCE_TABLE[i].power) {
+      if (i === 0) return ENGINE_PERFORMANCE_TABLE[0];
+      const prev = ENGINE_PERFORMANCE_TABLE[i - 1];
+      const next = ENGINE_PERFORMANCE_TABLE[i];
+      const t = (powerPercent - prev.power) / (next.power - prev.power);
       return {
-        fuelRate: f0 + t * (f - f0),
-        speed: s0 + t * (s - s0),
+        rpm: Math.round(prev.rpm + t * (next.rpm - prev.rpm)),
+        fuel: Math.round(prev.fuel + t * (next.fuel - prev.fuel)),
+        airflowKmh: Math.round(
+          prev.airflowKmh + t * (next.airflowKmh - prev.airflowKmh),
+        ),
       };
     }
   }
-  return { fuelRate: 847, speed: 135 };
+  return ENGINE_PERFORMANCE_TABLE[9];
 }
 
 function beaufortToMps(bf) {
@@ -115,11 +119,6 @@ function beaufortToMps(bf) {
     0, 0.5, 1.6, 3.4, 5.5, 8.0, 10.8, 13.9, 17.2, 20.8, 24.5, 28.5, 32.7,
   ];
   return scale[Math.min(12, Math.max(0, Math.round(bf)))];
-}
-
-function calculatePropellerRPM() {
-  if (Math.abs(airshipData.enginePower) < 0.1) return 0;
-  return airshipData.enginePower * 16.5;
 }
 
 // === ГРАФИКА ===
@@ -325,10 +324,10 @@ function calculateFuelTimeRemaining() {
   const powerPercent = Math.abs(airshipData.enginePower);
   if (powerPercent < 0.1) return "∞";
 
-  const { fuelRate } = interpolateFuelAndSpeed(powerPercent);
-  if (fuelRate <= 0) return "∞";
+  const { fuel } = getEngineData(powerPercent);
+  if (fuel <= 0) return "∞";
 
-  const hours = airshipData.fuelReserve / fuelRate;
+  const hours = airshipData.fuelReserve / fuel;
   if (hours > 24) return "∞";
 
   const h = Math.floor(hours).toString().padStart(2, "0");
@@ -386,9 +385,14 @@ function updateDisplays() {
   rudderValue.textContent = airshipData.rudder.toFixed(1) + "°";
   throttleValue.textContent = throttleLabels[airshipData.throttle] || "STOP";
 
-  const sign = airshipData.enginePower >= 0 ? "" : "-";
-  document.getElementById("enginePowerDisplay").textContent =
-    sign + Math.abs(Math.round(airshipData.enginePower)) + "%";
+  // === ОБНОВЛЁННЫЙ БЛОК ДВИГАТЕЛЕЙ ===
+  const engineData = getEngineData(Math.abs(airshipData.enginePower));
+  const powerSign = airshipData.enginePower >= 0 ? "" : "-";
+  const powerPercent = Math.abs(Math.round(airshipData.enginePower));
+
+  document.getElementById("enginePowerDisplay").innerHTML =
+    `${powerSign}${powerPercent}%<br>` +
+    `<small>RPM: ${engineData.rpm} | Дизель: ${engineData.fuel} л/ч | Поток: ${(engineData.airflowKmh / 3.6).toFixed(1)} м/с</small>`;
 
   let courseDeviation = 0;
   if (airshipData.hasTarget) {
@@ -438,12 +442,10 @@ function updateWindCompass() {
   const centerY = size / 2;
   const radius = size * 0.35;
 
-  // Ветер
   const windRad = ((windDirection - 90) * Math.PI) / 180;
   const windX = centerX + radius * Math.cos(windRad);
   const windY = centerY + radius * Math.sin(windRad);
 
-  // Направление движения по земле
   const trackRad = ((airshipData.groundTrack - 90) * Math.PI) / 180;
   const trackX = centerX + radius * Math.cos(trackRad);
   const trackY = centerY + radius * Math.sin(trackRad);
@@ -484,11 +486,9 @@ function updateGroundMotion() {
   const windSpeedMs = beaufortToMps(windSpeedBf);
   const windAngleRad = (windDirection * Math.PI) / 180;
 
-  // Воздушная скорость дирижабля
   const shipSpeedMs = airshipData.speed / 3.6;
   const shipAngleRad = (airshipData.heading * Math.PI) / 180;
 
-  // Компоненты: X = восток, Y = север
   const shipEast = shipSpeedMs * Math.sin(shipAngleRad);
   const shipNorth = shipSpeedMs * Math.cos(shipAngleRad);
 
@@ -498,13 +498,11 @@ function updateGroundMotion() {
   const totalEast = shipEast + windEast;
   const totalNorth = shipNorth + windNorth;
 
-  // Скорость по земле — ВСЕГДА положительная
   const groundSpeedMs = Math.sqrt(
     totalEast * totalEast + totalNorth * totalNorth,
   );
-  airshipData.groundSpeed = groundSpeedMs * 3.6; // ≥ 0
+  airshipData.groundSpeed = groundSpeedMs * 3.6;
 
-  // Направление движения по земле (0° = север, 90° = восток, 180° = юг)
   let trackDeg =
     ((Math.atan2(totalEast, totalNorth) * 180) / Math.PI + 360) % 360;
   airshipData.groundTrack = trackDeg;
@@ -597,13 +595,11 @@ function simulateStep() {
   const dtReal = (now - airshipData.lastSimulateTime) / 1000;
   airshipData.lastSimulateTime = now;
 
-  // === ОБНОВЛЕНИЕ ВРЕМЕНИ ===
   if (!isPaused) {
     const dtSimulated = dtReal * timeWarpFactor;
     airshipData.virtualTimeSeconds += dtSimulated;
   }
 
-  // === ЕСЛИ ПАУЗА — НИЧЕГО БОЛЬШЕ НЕ ДЕЛАТЬ ===
   if (isPaused) {
     updateDisplays();
     updateWindCompass();
@@ -680,7 +676,6 @@ function simulateStep() {
     throttleSlider.dispatchEvent(new Event("input"));
   }
 
-  // === ОБНОВЛЕНИЕ ДВИЖЕНИЯ ===
   if (!airshipData.anchorEnabled) {
     const currentSign = Math.sign(airshipData.enginePower);
     const targetSign = Math.sign(airshipData.throttle);
@@ -722,8 +717,8 @@ function simulateStep() {
       airshipData.fuelReserve > 0
     ) {
       const powerPercent = Math.abs(airshipData.enginePower);
-      const { fuelRate } = interpolateFuelAndSpeed(powerPercent);
-      const fuelRatePerSec = fuelRate / 3600;
+      const { fuel } = getEngineData(powerPercent);
+      const fuelRatePerSec = fuel / 3600;
       fuelUsed = fuelRatePerSec * dtReal * timeWarpFactor;
       if (airshipData.fuelReserve >= fuelUsed) {
         airshipData.fuelReserve -= fuelUsed;
@@ -735,9 +730,8 @@ function simulateStep() {
       }
     }
 
-    const { speed: targetSpeed } = interpolateFuelAndSpeed(
-      Math.abs(airshipData.enginePower),
-    );
+    const { airflowKmh } = getEngineData(Math.abs(airshipData.enginePower));
+    const targetSpeed = airflowKmh * 0.75; // реалистичное соотношение
     const sign = Math.sign(airshipData.enginePower);
     let finalTargetSpeed = sign * targetSpeed;
 
@@ -805,11 +799,14 @@ function simulateStep() {
         airshipData.angularVelocity = 0;
     }
 
-    const rpm = calculatePropellerRPM();
+    const rpm = getEngineData(Math.abs(airshipData.enginePower)).rpm / 20;
     if (rpm !== 0) {
       const rotationPerSecond = (Math.abs(rpm) * 360) / 60;
       airshipData.propRotationAngle +=
-        rotationPerSecond * dtReal * timeWarpFactor * Math.sign(rpm);
+        rotationPerSecond *
+        dtReal *
+        timeWarpFactor *
+        Math.sign(airshipData.enginePower);
       airshipData.propRotationAngle %= 360;
     }
 
@@ -843,9 +840,7 @@ function simulateStep() {
     }
   }
 
-  // === ОБНОВЛЕНИЕ ДВИЖЕНИЯ ПО ЗЕМЛЕ ===
   updateGroundMotion();
-
   updateDisplays();
   updateAirshipIcon();
   updateStats();
